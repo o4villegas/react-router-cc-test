@@ -4,6 +4,7 @@ import { loadConfig, type AppConfig } from "./config";
 import { createCacheService, createPerformanceMonitor, createImageOptimizer, type CacheService, type PerformanceMonitor, type ImageOptimizer } from "./cache";
 import { apiRateLimit, aiRateLimit } from "./middleware/rate-limit";
 import { productionCors, developmentCors } from "./middleware/cors";
+import { handleConversationRequest } from "./api/conversation";
 
 // Load configuration with environment detection
 let appConfig: AppConfig;
@@ -70,6 +71,7 @@ app.use('/api/*', apiRateLimit);
 // Apply AI-specific rate limiting to AI endpoints
 app.use('/api/assess-damage', aiRateLimit);
 app.use('/api/knowledge-search', aiRateLimit);
+app.use('/api/conversation', aiRateLimit);
 
 // Image security validation utilities (using configuration)
 const IMAGE_MAGIC_BYTES = {
@@ -400,11 +402,11 @@ app.post("/api/assess-damage", async (c) => {
       messages: [
         {
           role: "system", 
-          content: "You are a certified water damage restoration expert. Combine the vision analysis with industry guidelines to provide comprehensive assessment with specific remediation steps, timeline, and compliance requirements."
+          content: "You are a friendly and experienced water damage restoration expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
         },
         {
           role: "user",
-          content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, provide' : 'Based on standard water damage restoration practices, provide'} detailed professional assessment with: 1) Damage classification 2) Required actions 3) Estimated timeline 4) Equipment needed 5) Insurance documentation requirements.`
+          content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, help me understand' : 'Based on standard water damage restoration practices, help me understand'} this water damage situation. Please provide a conversational assessment that covers: 1) What type of damage we're dealing with 2) The steps we'll need to take 3) How long this might take 4) What equipment will be needed 5) What to document for insurance. Keep the tone friendly and reassuring, and end with a specific question to learn more about the situation.`
         }
       ]
     });
@@ -598,6 +600,9 @@ app.get("/api/knowledge-search", async (c) => {
     }, statusCode as any);
   }
 });
+
+// Conversation endpoint for chatbot follow-up questions
+app.post("/api/conversation", handleConversationRequest);
 
 // Performance and cache statistics endpoint
 app.get("/api/stats", async (c) => {

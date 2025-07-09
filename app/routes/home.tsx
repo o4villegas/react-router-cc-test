@@ -1,5 +1,5 @@
 import type { Route } from "./+types/home";
-import { DamageAssessment } from "../components/damage-assessment";
+import { Chatbot } from "../components/chatbot";
 import { loadClientConfig } from "../utils/client-config";
 
 export function meta({}: Route.MetaArgs) {
@@ -24,16 +24,19 @@ export function loader({ context }: Route.LoaderArgs) {
   return { 
     message: env?.VALUE_FROM_CLOUDFLARE || "Smart Damage Assessment Tool",
     apiEndpoint: environmentConfig.api.endpoints.damage_assessment,
-    searchEndpoint: environmentConfig.api.endpoints.knowledge_search,
+    conversationEndpoint: "/api/conversation",
     config: environmentConfig,
     environment,
   };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  return <DamageAssessment 
-    apiEndpoint={loaderData.apiEndpoint} 
-    searchEndpoint={loaderData.searchEndpoint}
-    config={loaderData.config}
-  />;
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+      <Chatbot 
+        apiEndpoint={loaderData.apiEndpoint}
+        config={loaderData.config}
+      />
+    </div>
+  );
 }
