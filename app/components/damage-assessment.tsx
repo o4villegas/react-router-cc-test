@@ -1,7 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { AIErrorBoundary } from "./error-boundary";
 import { logger } from "../utils/logger";
 import { type ClientConfig } from "../utils/client-config";
+import { 
+  createImageCompressor, 
+  createRequestBatcher, 
+  createFrontendPerformanceMonitor, 
+  createProgressiveLoader,
+  createMemoryOptimizer,
+  debounce
+} from "../utils/performance";
 
 interface ValidationError {
   type: 'size' | 'type' | 'dimensions' | 'corrupt';
@@ -17,6 +25,12 @@ interface AssessmentResult {
   timestamp: string;
   error?: string;
   details?: string;
+  performance?: {
+    total_time: number;
+    cached: boolean;
+  };
+  cached?: boolean;
+  cache_timestamp?: string;
 }
 
 interface SearchResult {
@@ -26,6 +40,10 @@ interface SearchResult {
   total_results: number;
   error?: string;
   details?: string;
+  performance?: {
+    total_time: number;
+    cached: boolean;
+  };
 }
 
 export function DamageAssessment({ 
@@ -45,6 +63,24 @@ export function DamageAssessment({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  // Performance utilities
+  const imageCompressor = useRef(createImageCompressor(config));
+  const requestBatcher = useRef(createRequestBatcher(config));
+  const performanceMonitor = useRef(createFrontendPerformanceMonitor(config));
+  const progressiveLoader = useRef(createProgressiveLoader());
+  const memoryOptimizer = useRef(createMemoryOptimizer());
+
+  // Performance state
+  const [performanceStats, setPerformanceStats] = useState<any>(null);
+  const [compressionStats, setCompressionStats] = useState<{ originalSize: number; compressedSize: number; compressed: boolean } | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      memoryOptimizer.current.cleanup();
+    };
+  }, []);
 
   const validateImage = (file: File): Promise<ValidationError | null> => {
     return new Promise((resolve) => {
@@ -194,28 +230,69 @@ export function DamageAssessment({
   };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const endTimer = performanceMonitor.current.startTimer('image_upload_processing');
+    
     const file = event.target.files?.[0];
     setValidationError(null);
     setSelectedImage(null);
     setImagePreview("");
+    setCompressionStats(null);
     
     if (!file) return;
     
-    const validationError = await validateImage(file);
-    if (validationError) {
-      setValidationError(validationError);
-      return;
+    try {
+      const validationError = await validateImage(file);
+      if (validationError) {
+        setValidationError(validationError);
+        return;
+      }
+      
+      // Check if compression would be beneficial
+      let finalFile: File | Blob = file;
+      if (imageCompressor.current.shouldCompress(file)) {
+        const compressionResult = await imageCompressor.current.compressImage(file);
+        finalFile = new File([compressionResult.file], file.name, { type: compressionResult.file.type });
+        
+        setCompressionStats({
+          originalSize: compressionResult.originalSize,
+          compressedSize: compressionResult.compressedSize,
+          compressed: compressionResult.compressed
+        });
+        
+        logger.info('Image compression completed', {
+          original_size: compressionResult.originalSize,
+          compressed_size: compressionResult.compressedSize,
+          compression_ratio: compressionResult.compressedSize / compressionResult.originalSize,
+          compressed: compressionResult.compressed
+        });
+      }
+      
+      setSelectedImage(finalFile as File);
+      
+      // Use memory optimizer for object URL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setImagePreview(dataUrl);
+      };
+      reader.readAsDataURL(finalFile);
+      
+      endTimer();
+    } catch (error) {
+      endTimer();
+      logger.error('Image upload processing failed', error);
+      setValidationError({
+        type: 'corrupt',
+        message: 'Failed to process image. Please try again.'
+      });
     }
-    
-    setSelectedImage(file);
-    const reader = new FileReader();
-    reader.onload = (e) => setImagePreview(e.target?.result as string);
-    reader.readAsDataURL(file);
   };
 
   const assessDamage = useCallback(async () => {
     if (!selectedImage) return;
     
+    const endTimer = performanceMonitor.current.startTimer('damage_assessment_request');
+    progressiveLoader.current.setLoading('assessment', true);
     setLoading(true);
     setAssessment(null);
     
@@ -225,32 +302,43 @@ export function DamageAssessment({
         try {
           const base64 = e.target?.result as string;
           
-          // Create abort controller for timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), config.api.timeout.damage_assessment);
+          // Use request batching to prevent duplicate requests
+          const requestKey = `assess_${selectedImage.name}_${selectedImage.size}`;
           
-          const response = await fetch(apiEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64 }),
-            signal: controller.signal
+          const result = await requestBatcher.current.batchRequest(requestKey, async () => {
+            // Create abort controller for timeout
+            const controller = new AbortController();
+            const timeoutId = memoryOptimizer.current.setTimeout(() => controller.abort(), config.api.timeout.damage_assessment);
+            
+            const response = await fetch(apiEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ image: base64 }),
+              signal: controller.signal
+            });
+            
+            
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return await response.json() as AssessmentResult;
           });
-          
-          clearTimeout(timeoutId);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-          
-          const result = await response.json() as AssessmentResult;
           
           if (!result.success && result.error) {
             throw new Error(`AI Assessment Error: ${result.error} - ${result.details || ''}`);
           }
           
+          // Store performance stats if available
+          if (result.performance) {
+            setPerformanceStats(result.performance);
+          }
+          
           setAssessment(result);
           setRetryCount(0); // Reset retry count on success
+          endTimer();
         } catch (error) {
+          endTimer();
           logger.aiError('image assessment', error, 'DamageAssessment');
           
           // Enhanced error handling with specific error types
@@ -302,11 +390,13 @@ export function DamageAssessment({
       };
       
       reader.onerror = () => {
+        endTimer();
         throw new Error('Failed to read image file. The file may be corrupted.');
       };
       
       reader.readAsDataURL(selectedImage);
     } catch (error) {
+      endTimer();
       logger.error('Failed to read image file', error, 'DamageAssessment');
       setAssessment({
         success: false,
@@ -319,36 +409,47 @@ export function DamageAssessment({
         timestamp: new Date().toISOString()
       });
     } finally {
+      progressiveLoader.current.setLoading('assessment', false);
       setLoading(false);
     }
-  }, [selectedImage, apiEndpoint]);
+  }, [selectedImage, apiEndpoint, config.api.timeout.damage_assessment]);
 
   const searchKnowledgeBase = useCallback(async () => {
     if (!searchQuery.trim()) return;
     
+    const endTimer = performanceMonitor.current.startTimer('knowledge_search_request');
+    progressiveLoader.current.setLoading('search', true);
+    
     try {
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), config.api.timeout.knowledge_search);
+      // Use request batching for duplicate queries
+      const requestKey = `search_${searchQuery.trim().toLowerCase()}`;
       
-      const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`, {
-        signal: controller.signal
+      const result = await requestBatcher.current.batchRequest(requestKey, async () => {
+        // Create abort controller for timeout
+        const controller = new AbortController();
+        const timeoutId = memoryOptimizer.current.setTimeout(() => controller.abort(), config.api.timeout.knowledge_search);
+        
+        const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return await response.json() as SearchResult;
       });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const result = await response.json() as SearchResult;
       
       if (!result.success && result.error) {
         throw new Error(`Search Error: ${result.error}${result.details ? ` - ${result.details}` : ''}`);
       }
       
       setSearchResults(result);
+      endTimer();
     } catch (error) {
+      endTimer();
       logger.apiError('knowledge search', error, 'DamageAssessment');
       
       // Handle timeout errors specifically
@@ -367,8 +468,18 @@ export function DamageAssessment({
         total_results: 0,
         error: errorMessage
       });
+    } finally {
+      progressiveLoader.current.setLoading('search', false);
     }
-  }, [searchQuery, searchEndpoint]);
+  }, [searchQuery, searchEndpoint, config.api.timeout.knowledge_search]);
+
+  // Debounced search function for better performance
+  const debouncedSearch = useCallback(
+    debounce(() => {
+      searchKnowledgeBase();
+    }, 500),
+    [searchKnowledgeBase]
+  );
 
   const handleRetry = useCallback(() => {
     setRetryCount(prev => prev + 1);
@@ -428,6 +539,16 @@ export function DamageAssessment({
                   alt="Preview of uploaded damage photo" 
                   className="w-full h-64 object-cover rounded-lg border"
                 />
+                
+                {compressionStats && compressionStats.compressed && (
+                  <div className="p-2 bg-green-50 border border-green-200 rounded dark:bg-green-900/20 dark:border-green-800">
+                    <p className="text-green-700 dark:text-green-400 text-xs">
+                      ✅ Image optimized: {(compressionStats.originalSize / 1024 / 1024).toFixed(1)}MB → {(compressionStats.compressedSize / 1024 / 1024).toFixed(1)}MB 
+                      ({Math.round((1 - compressionStats.compressedSize / compressionStats.originalSize) * 100)}% reduction)
+                    </p>
+                  </div>
+                )}
+                
                 <button 
                   onClick={assessDamage} 
                   disabled={loading || validationError !== null}
@@ -473,9 +594,9 @@ export function DamageAssessment({
                 onClick={searchKnowledgeBase}
                 className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                 aria-label="Search knowledge base"
-                disabled={!searchQuery.trim()}
+                disabled={!searchQuery.trim() || progressiveLoader.current.isLoading('search')}
               >
-                🔍
+                {progressiveLoader.current.isLoading('search') ? '⏳' : '🔍'}
               </button>
             </div>
             <div id="search-help" className="sr-only">
@@ -578,33 +699,54 @@ export function DamageAssessment({
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium">Confidence Score:</span>
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-32 bg-gray-200 rounded-full h-2 dark:bg-gray-700"
-                        role="progressbar"
-                        aria-valuenow={Math.round(assessment.confidence_score * 100)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Assessment confidence: ${Math.round(assessment.confidence_score * 100)} percent`}
-                      >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium">Confidence Score:</span>
+                      <div className="flex items-center gap-2">
                         <div 
-                          className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                          style={{ width: `${assessment.confidence_score * 100}%` }}
-                        ></div>
+                          className="w-32 bg-gray-200 rounded-full h-2 dark:bg-gray-700"
+                          role="progressbar"
+                          aria-valuenow={Math.round(assessment.confidence_score * 100)}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`Assessment confidence: ${Math.round(assessment.confidence_score * 100)} percent`}
+                        >
+                          <div 
+                            className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${assessment.confidence_score * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm font-bold" aria-hidden="true">
+                          {Math.round(assessment.confidence_score * 100)}%
+                        </span>
                       </div>
-                      <span className="text-sm font-bold" aria-hidden="true">
-                        {Math.round(assessment.confidence_score * 100)}%
-                      </span>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      <time dateTime={assessment.timestamp}>
+                        {new Date(assessment.timestamp).toLocaleString()}
+                      </time>
                     </div>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    <time dateTime={assessment.timestamp}>
-                      {new Date(assessment.timestamp).toLocaleString()}
-                    </time>
-                  </div>
+                  
+                  {(performanceStats || assessment.performance) && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Performance:</span>
+                        <div className="flex gap-4 text-xs text-blue-600 dark:text-blue-300">
+                          {assessment.performance?.total_time && (
+                            <span>⏱️ {(assessment.performance.total_time / 1000).toFixed(1)}s</span>
+                          )}
+                          {assessment.cached && (
+                            <span>💾 Cached</span>
+                          )}
+                          {assessment.performance?.cached === false && (
+                            <span>🔄 Fresh</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (

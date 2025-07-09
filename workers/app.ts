@@ -1,11 +1,19 @@
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
 import { loadConfig, type AppConfig } from "./config";
+import { createCacheService, createPerformanceMonitor, createImageOptimizer, type CacheService, type PerformanceMonitor, type ImageOptimizer } from "./cache";
 
 // Load configuration with environment detection
 let appConfig: AppConfig;
+let cacheService: CacheService;
+let performanceMonitor: PerformanceMonitor;
+let imageOptimizer: ImageOptimizer;
+
 try {
   appConfig = loadConfig();
+  cacheService = createCacheService(appConfig);
+  performanceMonitor = createPerformanceMonitor();
+  imageOptimizer = createImageOptimizer(appConfig);
 } catch (error) {
   console.error('Failed to load configuration:', error);
   throw error;
@@ -179,6 +187,8 @@ function sanitizeImageBuffer(buffer: Uint8Array): Uint8Array {
 
 // Enhanced API routes for damage assessment with RAG
 app.post("/api/assess-damage", async (c) => {
+  const endTimer = performanceMonitor.startTimer('damage_assessment_total');
+  
   try {
     // Validate request body structure
     const body = await c.req.json();
@@ -299,28 +309,68 @@ app.post("/api/assess-damage", async (c) => {
     // Sanitize image buffer to remove potential malicious data
     const sanitizedBuffer = sanitizeImageBuffer(imageBuffer);
     
+    // Generate image hash for caching
+    const imageHash = cacheService.generateImageHash(sanitizedBuffer);
+    
+    // Check cache first
+    const cachedResult = await cacheService.getCachedAssessmentResult(imageHash);
+    if (cachedResult) {
+      logger.info('Cache hit for assessment', { imageHash });
+      endTimer();
+      return c.json({
+        ...cachedResult.assessment,
+        cached: true,
+        cache_timestamp: cachedResult.timestamp
+      });
+    }
+    
     // Log security validation success
     logger.info(`Image security validation passed`, {
       declaredType: declaredMimeType,
       detectedType: signatureValidation.detectedType,
       originalSize: imageBuffer.length,
-      sanitizedSize: sanitizedBuffer.length
+      sanitizedSize: sanitizedBuffer.length,
+      imageHash
     });
     
     // Step 1: Vision AI Analysis using LLaVA (use sanitized buffer)
-    const visionResponse = await (c.env as any).AI.run(appConfig.ai.vision_model, {
-      image: Array.from(sanitizedBuffer),
-      prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
-    });
+    const visionTimer = performanceMonitor.startTimer('vision_analysis');
+    
+    // Check vision cache first
+    let visionResponse = await cacheService.getCachedVisionResult(imageHash);
+    if (!visionResponse) {
+      visionResponse = await (c.env as any).AI.run(appConfig.ai.vision_model, {
+        image: Array.from(sanitizedBuffer),
+        prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
+      });
+      
+      // Cache vision result
+      await cacheService.cacheVisionResult(imageHash, visionResponse);
+    }
+    
+    visionTimer();
 
     // Step 2: RAG Query for Industry Knowledge
+    const ragTimer = performanceMonitor.startTimer('rag_search');
     let ragResponse = { response: '', data: [] };
+    
     try {
       // Check if AI binding and autorag method exist
       if ((c.env as any).AI && typeof (c.env as any).AI.autorag === 'function' && appConfig.ai.enable_autorag) {
-        ragResponse = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
-          query: `water damage ${visionResponse.description} remediation guidelines IICRC standards`
-        });
+        const ragQuery = `water damage ${visionResponse.description} remediation guidelines IICRC standards`;
+        
+        // Check RAG cache first
+        let cachedRAGResult = await cacheService.getCachedRAGResult(ragQuery);
+        if (cachedRAGResult) {
+          ragResponse = cachedRAGResult;
+        } else {
+          ragResponse = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
+            query: ragQuery
+          });
+          
+          // Cache RAG result
+          await cacheService.cacheRAGResult(ragQuery, ragResponse);
+        }
       } else {
         logger.warn('AutoRAG not available or disabled, continuing with vision-only analysis');
       }
@@ -328,8 +378,12 @@ app.post("/api/assess-damage", async (c) => {
       logger.error('AutoRAG search failed', { error: (error as Error).message, stack: (error as Error).stack });
       // Continue with vision-only analysis
     }
+    
+    ragTimer();
 
     // Step 3: Combine Vision + RAG for Enhanced Assessment
+    const assessmentTimer = performanceMonitor.startTimer('enhanced_assessment');
+    
     const enhancedAssessment = await (c.env as any).AI.run(appConfig.ai.language_model, {
       messages: [
         {
@@ -342,16 +396,28 @@ app.post("/api/assess-damage", async (c) => {
         }
       ]
     });
+    
+    assessmentTimer();
 
-    return c.json({
+    // Prepare final response
+    const finalResult = {
       success: true,
       vision_analysis: visionResponse.description,
       industry_sources: ragResponse.data || [],
       autorag_response: ragResponse.response || null,
       enhanced_assessment: enhancedAssessment.response,
       confidence_score: visionResponse.confidence || appConfig.ai.confidence_threshold,
-      timestamp: new Date().toISOString()
-    });
+      timestamp: new Date().toISOString(),
+      performance: {
+        total_time: endTimer(),
+        cached: false
+      }
+    };
+
+    // Cache the complete assessment
+    await cacheService.cacheAssessmentResult(imageHash, visionResponse, ragResponse, finalResult);
+
+    return c.json(finalResult);
 
   } catch (error) {
     logger.error('AI assessment failed', { error: (error as Error).message, stack: (error as Error).stack });
@@ -403,6 +469,8 @@ app.post("/api/assess-damage", async (c) => {
 
 // Helper route for testing RAG knowledge base
 app.get("/api/knowledge-search", async (c) => {
+  const endTimer = performanceMonitor.startTimer('knowledge_search');
+  
   const query = c.req.query('q');
   if (!query) {
     return c.json({ 
@@ -448,20 +516,38 @@ app.get("/api/knowledge-search", async (c) => {
       }, 500);
     }
     
-    // Use the new AutoRAG dataset with aiSearch method
-    const results = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
-      query: query
-    });
+    // Check cache first
+    let results = await cacheService.getCachedRAGResult(query);
+    let cached = false;
+    
+    if (!results) {
+      // Use the new AutoRAG dataset with aiSearch method
+      results = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
+        query: query
+      });
+      
+      // Cache the results
+      await cacheService.cacheRAGResult(query, results);
+    } else {
+      cached = true;
+    }
+    
+    const totalTime = endTimer();
     
     return c.json({
       success: true,
       query: query,
       response: results.response || null,
       results: results.data || [],
-      total_results: results.data?.length || 0
+      total_results: results.data?.length || 0,
+      performance: {
+        total_time: totalTime,
+        cached: cached
+      }
     });
     
   } catch (error) {
+    endTimer(); // End the timer even on error
     logger.error('Knowledge search failed', { error: (error as Error).message, stack: (error as Error).stack });
     
     // Enhanced error handling with specific error types
@@ -498,6 +584,33 @@ app.get("/api/knowledge-search", async (c) => {
       details: errorDetails,
       timestamp: new Date().toISOString()
     }, statusCode as any);
+  }
+});
+
+// Performance and cache statistics endpoint
+app.get("/api/stats", async (c) => {
+  try {
+    const cacheStats = cacheService.getCacheStats();
+    const performanceMetrics = performanceMonitor.getAllMetrics();
+    
+    return c.json({
+      success: true,
+      cache: cacheStats,
+      performance: performanceMetrics,
+      timestamp: new Date().toISOString(),
+      config: {
+        caching_enabled: appConfig.performance.enable_caching,
+        cache_ttl: appConfig.performance.cache_ttl,
+        max_concurrent_requests: appConfig.performance.max_concurrent_requests
+      }
+    });
+  } catch (error) {
+    logger.error('Stats endpoint failed', { error: (error as Error).message });
+    return c.json({
+      success: false,
+      error: "Failed to retrieve statistics",
+      timestamp: new Date().toISOString()
+    }, 500);
   }
 });
 
