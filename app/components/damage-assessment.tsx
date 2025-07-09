@@ -30,6 +30,7 @@ interface SearchResult {
   results: any[];
   total_results: number;
   error?: string;
+  details?: string;
 }
 
 export function DamageAssessment({ 
@@ -138,11 +139,18 @@ export function DamageAssessment({
         try {
           const base64 = e.target?.result as string;
           
+          // Create abort controller for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+          
           const response = await fetch(apiEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64 })
+            body: JSON.stringify({ image: base64 }),
+            signal: controller.signal
           });
+          
+          clearTimeout(timeoutId);
           
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -164,7 +172,10 @@ export function DamageAssessment({
           let errorDetails = '';
           
           if (error instanceof Error) {
-            if (error.message.includes('HTTP 429')) {
+            if (error.name === 'AbortError') {
+              errorMessage = 'Request timeout';
+              errorDetails = 'The AI analysis is taking longer than expected. Please try again or use a smaller image.';
+            } else if (error.message.includes('HTTP 429')) {
               errorMessage = 'Rate limit exceeded';
               errorDetails = 'Too many requests. Please wait a moment and try again.';
             } else if (error.message.includes('HTTP 500')) {
@@ -221,7 +232,15 @@ export function DamageAssessment({
     if (!searchQuery.trim()) return;
     
     try {
-      const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`);
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for search
+      
+      const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`, {
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -230,12 +249,20 @@ export function DamageAssessment({
       const result = await response.json() as SearchResult;
       
       if (!result.success && result.error) {
-        throw new Error(`Search Error: ${result.error} - ${result.details || ''}`);
+        throw new Error(`Search Error: ${result.error}${result.details ? ` - ${result.details}` : ''}`);
       }
       
       setSearchResults(result);
     } catch (error) {
       logger.apiError('knowledge search', error, 'DamageAssessment');
+      
+      // Handle timeout errors specifically
+      let errorMessage = 'Search failed';
+      if (error instanceof Error && error.name === 'AbortError') {
+        errorMessage = 'Search timeout - please try again';
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       
       // Set error state for search results
       setSearchResults({
@@ -243,7 +270,7 @@ export function DamageAssessment({
         query: searchQuery,
         results: [],
         total_results: 0,
-        error: error instanceof Error ? error.message : 'Search failed'
+        error: errorMessage
       });
     }
   }, [searchQuery, searchEndpoint]);
