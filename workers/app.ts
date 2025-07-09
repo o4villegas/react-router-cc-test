@@ -16,6 +16,131 @@ const logger = {
 
 const app = new Hono();
 
+// Image security validation utilities
+const IMAGE_MAGIC_BYTES = {
+  jpeg: [0xFF, 0xD8, 0xFF],
+  png: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
+  webp: [0x52, 0x49, 0x46, 0x46], // RIFF header for WebP
+  gif: [0x47, 0x49, 0x46, 0x38], // GIF8 header
+};
+
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_DIMENSIONS = 8192; // Maximum width/height in pixels
+
+function validateImageSignature(buffer: Uint8Array): { valid: boolean; detectedType: string | null; error?: string } {
+  if (buffer.length < 8) {
+    return { valid: false, detectedType: null, error: 'Image data too small to validate' };
+  }
+
+  // Check JPEG signature
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return { valid: true, detectedType: 'image/jpeg' };
+  }
+
+  // Check PNG signature
+  if (buffer.length >= 8 && 
+      buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+      buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A) {
+    return { valid: true, detectedType: 'image/png' };
+  }
+
+  // Check WebP signature (RIFF + WebP)
+  if (buffer.length >= 12 &&
+      buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+    return { valid: true, detectedType: 'image/webp' };
+  }
+
+  return { valid: false, detectedType: null, error: 'Unsupported or invalid image format' };
+}
+
+function validateImageStructure(buffer: Uint8Array, mimeType: string): { valid: boolean; error?: string } {
+  try {
+    if (mimeType === 'image/jpeg') {
+      return validateJPEGStructure(buffer);
+    } else if (mimeType === 'image/png') {
+      return validatePNGStructure(buffer);
+    } else if (mimeType === 'image/webp') {
+      return validateWebPStructure(buffer);
+    }
+    return { valid: false, error: 'Unsupported image type for structure validation' };
+  } catch (error) {
+    return { valid: false, error: 'Image structure validation failed' };
+  }
+}
+
+function validateJPEGStructure(buffer: Uint8Array): { valid: boolean; error?: string } {
+  // Basic JPEG validation - check for proper SOI and EOI markers
+  if (buffer.length < 4) return { valid: false, error: 'JPEG too small' };
+  
+  // Start of Image marker (SOI)
+  if (buffer[0] !== 0xFF || buffer[1] !== 0xD8) {
+    return { valid: false, error: 'Invalid JPEG start marker' };
+  }
+  
+  // Look for End of Image marker (EOI) in last few bytes
+  const endIndex = buffer.length - 2;
+  if (endIndex >= 0 && (buffer[endIndex] !== 0xFF || buffer[endIndex + 1] !== 0xD9)) {
+    // EOI might not be at the very end due to metadata, so check last 100 bytes
+    let foundEOI = false;
+    for (let i = Math.max(0, buffer.length - 100); i < buffer.length - 1; i++) {
+      if (buffer[i] === 0xFF && buffer[i + 1] === 0xD9) {
+        foundEOI = true;
+        break;
+      }
+    }
+    if (!foundEOI) {
+      return { valid: false, error: 'JPEG missing end marker' };
+    }
+  }
+  
+  return { valid: true };
+}
+
+function validatePNGStructure(buffer: Uint8Array): { valid: boolean; error?: string } {
+  if (buffer.length < 33) return { valid: false, error: 'PNG too small' };
+  
+  // PNG signature already validated, check for IHDR chunk
+  if (buffer[12] !== 0x49 || buffer[13] !== 0x48 || buffer[14] !== 0x44 || buffer[15] !== 0x52) {
+    return { valid: false, error: 'PNG missing IHDR chunk' };
+  }
+  
+  // Basic dimension validation from IHDR
+  const width = (buffer[16] << 24) | (buffer[17] << 16) | (buffer[18] << 8) | buffer[19];
+  const height = (buffer[20] << 24) | (buffer[21] << 16) | (buffer[22] << 8) | buffer[23];
+  
+  if (width === 0 || height === 0 || width > MAX_IMAGE_DIMENSIONS || height > MAX_IMAGE_DIMENSIONS) {
+    return { valid: false, error: `PNG dimensions invalid or too large: ${width}x${height}` };
+  }
+  
+  return { valid: true };
+}
+
+function validateWebPStructure(buffer: Uint8Array): { valid: boolean; error?: string } {
+  if (buffer.length < 20) return { valid: false, error: 'WebP too small' };
+  
+  // WebP signature already validated, check file size consistency
+  const fileSize = (buffer[4]) | (buffer[5] << 8) | (buffer[6] << 16) | (buffer[7] << 24);
+  if (fileSize + 8 !== buffer.length) {
+    return { valid: false, error: 'WebP file size mismatch' };
+  }
+  
+  return { valid: true };
+}
+
+function sanitizeImageBuffer(buffer: Uint8Array): Uint8Array {
+  // Create a copy to avoid modifying original
+  const sanitized = new Uint8Array(buffer);
+  
+  // Remove any potential null bytes at the end (common in malformed files)
+  let actualLength = sanitized.length;
+  while (actualLength > 0 && sanitized[actualLength - 1] === 0) {
+    actualLength--;
+  }
+  
+  return sanitized.slice(0, actualLength);
+}
+
 // Enhanced API routes for damage assessment with RAG
 app.post("/api/assess-damage", async (c) => {
   try {
@@ -38,12 +163,31 @@ app.post("/api/assess-damage", async (c) => {
       }, 400);
     }
 
-    // Validate data URI format
+    // Validate data URI format and extract MIME type
     if (!image.startsWith('data:image/')) {
       return c.json({ 
         success: false, 
         error: "Invalid image format",
         details: "Image must be a valid data URI starting with 'data:image/'" 
+      }, 400);
+    }
+
+    // Extract and validate MIME type from data URI
+    const mimeTypeMatch = image.match(/^data:(image\/[^;]+);base64,/);
+    if (!mimeTypeMatch) {
+      return c.json({ 
+        success: false, 
+        error: "Invalid data URI format",
+        details: "Data URI must specify MIME type and base64 encoding" 
+      }, 400);
+    }
+
+    const declaredMimeType = mimeTypeMatch[1];
+    if (!ALLOWED_MIME_TYPES.includes(declaredMimeType)) {
+      return c.json({ 
+        success: false, 
+        error: "Unsupported image type",
+        details: `Only JPEG, PNG, and WebP images are supported. Received: ${declaredMimeType}` 
       }, 400);
     }
 
@@ -86,10 +230,50 @@ app.post("/api/assess-damage", async (c) => {
         details: `Decoded image size ${imageBuffer.length} bytes exceeds limit of 100MB` 
       }, 413);
     }
+
+    // Security validation: Verify image file signature matches declared MIME type
+    const signatureValidation = validateImageSignature(imageBuffer);
+    if (!signatureValidation.valid) {
+      return c.json({ 
+        success: false, 
+        error: "Invalid image file",
+        details: signatureValidation.error || "Image file signature validation failed" 
+      }, 400);
+    }
+
+    // Verify declared MIME type matches actual image type
+    if (signatureValidation.detectedType !== declaredMimeType) {
+      return c.json({ 
+        success: false, 
+        error: "Image type mismatch",
+        details: `Declared type ${declaredMimeType} does not match actual type ${signatureValidation.detectedType}` 
+      }, 400);
+    }
+
+    // Validate internal image structure
+    const structureValidation = validateImageStructure(imageBuffer, declaredMimeType);
+    if (!structureValidation.valid) {
+      return c.json({ 
+        success: false, 
+        error: "Corrupted image file",
+        details: structureValidation.error || "Image structure validation failed" 
+      }, 400);
+    }
+
+    // Sanitize image buffer to remove potential malicious data
+    const sanitizedBuffer = sanitizeImageBuffer(imageBuffer);
     
-    // Step 1: Vision AI Analysis using LLaVA
+    // Log security validation success
+    logger.info(`Image security validation passed`, {
+      declaredType: declaredMimeType,
+      detectedType: signatureValidation.detectedType,
+      originalSize: imageBuffer.length,
+      sanitizedSize: sanitizedBuffer.length
+    });
+    
+    // Step 1: Vision AI Analysis using LLaVA (use sanitized buffer)
     const visionResponse = await (c.env as any).AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
-      image: Array.from(imageBuffer),
+      image: Array.from(sanitizedBuffer),
       prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
     });
 
@@ -159,6 +343,14 @@ app.post("/api/assess-damage", async (c) => {
         statusCode = 507;
         errorMessage = "Insufficient resources";
         errorDetails = "The image is too large to process";
+      } else if (error.message.includes('Invalid image') || error.message.includes('Corrupted image')) {
+        statusCode = 400;
+        errorMessage = "Invalid image file";
+        errorDetails = "The uploaded image file is corrupted or malformed";
+      } else if (error.message.includes('Image type mismatch')) {
+        statusCode = 400;
+        errorMessage = "Image validation failed";
+        errorDetails = "The image file does not match its declared format";
       } else {
         errorDetails = error.message;
       }

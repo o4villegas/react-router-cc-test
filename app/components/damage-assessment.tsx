@@ -69,41 +69,109 @@ export function DamageAssessment({
         return;
       }
 
-      // Check image dimensions
-      const img = new Image();
-      const url = URL.createObjectURL(file);
+      // Additional file extension validation
+      const fileName = file.name.toLowerCase();
+      const validExtensions = ['.jpg', '.jpeg', '.png', '.webp'];
+      const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
       
-      img.onload = () => {
-        URL.revokeObjectURL(url);
-        
-        if (img.width > MAX_DIMENSIONS.width || img.height > MAX_DIMENSIONS.height) {
+      if (!hasValidExtension) {
+        resolve({
+          type: 'type',
+          message: `File must have a valid image extension (.jpg, .jpeg, .png, .webp). Current file: ${file.name}`
+        });
+        return;
+      }
+
+      // Validate file name doesn't contain suspicious characters
+      const suspiciousChars = /[<>:"/\\|?*\x00-\x1f]/;
+      if (suspiciousChars.test(file.name)) {
+        resolve({
+          type: 'type',
+          message: 'File name contains invalid characters'
+        });
+        return;
+      }
+
+      // Validate image file header (magic bytes) before processing
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        if (!arrayBuffer) {
           resolve({
-            type: 'dimensions',
-            message: `Image dimensions must be less than ${MAX_DIMENSIONS.width}x${MAX_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+            type: 'corrupt',
+            message: 'Unable to read image file data'
           });
           return;
         }
+
+        const bytes = new Uint8Array(arrayBuffer, 0, Math.min(12, arrayBuffer.byteLength));
         
-        if (img.width < MIN_DIMENSIONS.width || img.height < MIN_DIMENSIONS.height) {
+        // Validate image signature
+        let isValidSignature = false;
+        if (file.type === 'image/jpeg' && bytes.length >= 3) {
+          isValidSignature = bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
+        } else if (file.type === 'image/png' && bytes.length >= 8) {
+          isValidSignature = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47 &&
+                            bytes[4] === 0x0D && bytes[5] === 0x0A && bytes[6] === 0x1A && bytes[7] === 0x0A;
+        } else if (file.type === 'image/webp' && bytes.length >= 12) {
+          isValidSignature = bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+                            bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+        }
+
+        if (!isValidSignature) {
           resolve({
-            type: 'dimensions',
-            message: `Image dimensions must be at least ${MIN_DIMENSIONS.width}x${MIN_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+            type: 'corrupt',
+            message: `File signature does not match declared type ${file.type}`
           });
           return;
         }
+
+        // Check image dimensions
+        const img = new Image();
+        const url = URL.createObjectURL(file);
         
-        resolve(null); // Valid image
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          
+          if (img.width > MAX_DIMENSIONS.width || img.height > MAX_DIMENSIONS.height) {
+            resolve({
+              type: 'dimensions',
+              message: `Image dimensions must be less than ${MAX_DIMENSIONS.width}x${MAX_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+            });
+            return;
+          }
+          
+          if (img.width < MIN_DIMENSIONS.width || img.height < MIN_DIMENSIONS.height) {
+            resolve({
+              type: 'dimensions',
+              message: `Image dimensions must be at least ${MIN_DIMENSIONS.width}x${MIN_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+            });
+            return;
+          }
+          
+          resolve(null); // Valid image
+        };
+        
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve({
+            type: 'corrupt',
+            message: 'Unable to load image. File may be corrupted or invalid.'
+          });
+        };
+        
+        img.src = url;
       };
-      
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
+
+      reader.onerror = () => {
         resolve({
           type: 'corrupt',
-          message: 'Unable to load image. File may be corrupted or invalid.'
+          message: 'Unable to read image file'
         });
       };
-      
-      img.src = url;
+
+      // Read first 12 bytes for signature validation
+      reader.readAsArrayBuffer(file.slice(0, 12));
     });
   };
 
@@ -187,6 +255,15 @@ export function DamageAssessment({
             } else if (error.message.includes('AI Assessment Error')) {
               errorMessage = 'AI processing error';
               errorDetails = error.message;
+            } else if (error.message.includes('Invalid image file')) {
+              errorMessage = 'Invalid image';
+              errorDetails = 'The uploaded image file is corrupted or not a valid image format.';
+            } else if (error.message.includes('Image validation failed')) {
+              errorMessage = 'Image validation error';
+              errorDetails = 'The image file does not match its declared format or contains invalid data.';
+            } else if (error.message.includes('Image type mismatch')) {
+              errorMessage = 'Image format error';
+              errorDetails = 'The actual image format does not match the file extension.';
             } else {
               errorMessage = 'Unexpected error';
               errorDetails = error.message;
