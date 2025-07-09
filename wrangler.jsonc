@@ -7,7 +7,7 @@
   "compatibility_date": "2025-04-01",
   "main": "./workers/app.ts",
   "vars": {
-    "VALUE_FROM_CLOUDFLARE": "Hello from Hono/CF"
+    "VALUE_FROM_CLOUDFLARE": "Production Environment - DamageScan"
   },
   "observability": {
     "enabled": true
@@ -48,17 +48,17 @@
   "ai": {
     "binding": "AI"
   },
-  // "autorag": [
-  //   {
-  //     "binding": "AUTORAG",
-  //     "dataset_id": "REPLACE_WITH_YOUR_DATASET_ID"
-  //   }
-  // ],
-  // "r2_buckets": [
-  //   {
-  //     "binding": "R2_BUCKET",
-  //     "bucket_name": "REPLACE_WITH_YOUR_BUCKET_NAME"
-  //   }
-  // ],
+  "autorag": [
+    {
+      "binding": "AUTORAG",
+      "dataset_id": "damagescan-chat-v2"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "damagescan"
+    }
+  ],
   "upload_source_maps": true
 }

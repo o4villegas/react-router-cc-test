@@ -26,20 +26,20 @@ app.post("/api/assess-damage", async (c) => {
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     
     // Step 1: Vision AI Analysis using LLaVA
-    const visionResponse = await c.env.AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
+    const visionResponse = await (c.env as any).AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
       image: Array.from(imageBuffer),
       prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
     });
 
     // Step 2: RAG Query for Industry Knowledge
-    const ragResponse = await c.env.AUTORAG.search({
+    const ragResponse = await (c.env as any).AUTORAG.search({
       query: `water damage ${visionResponse.description} remediation guidelines IICRC standards`,
       limit: 3,
       score_threshold: 0.7
     });
 
     // Step 3: Combine Vision + RAG for Enhanced Assessment
-    const enhancedAssessment = await c.env.AI.run('@cf/meta/llama-3.2-3b-instruct', {
+    const enhancedAssessment = await (c.env as any).AI.run('@cf/meta/llama-3.2-3b-instruct', {
       messages: [
         {
           role: "system", 
@@ -62,11 +62,11 @@ app.post("/api/assess-damage", async (c) => {
     });
 
   } catch (error) {
-    logger.error('AI assessment failed', { error: error.message, stack: error.stack });
+    logger.error('AI assessment failed', { error: (error as Error).message, stack: (error as Error).stack });
     return c.json({ 
       success: false, 
       error: "Assessment failed", 
-      details: error.message 
+      details: (error as Error).message 
     }, 500);
   }
 });
@@ -77,7 +77,7 @@ app.get("/api/knowledge-search", async (c) => {
   if (!query) return c.json({ error: "Query parameter 'q' required" }, 400);
   
   try {
-    const results = await c.env.AUTORAG.search({
+    const results = await (c.env as any).AUTORAG.search({
       query: query,
       limit: 5,
       score_threshold: 0.5
@@ -93,7 +93,7 @@ app.get("/api/knowledge-search", async (c) => {
     return c.json({ 
       success: false, 
       error: "Search failed", 
-      details: error.message 
+      details: (error as Error).message 
     }, 500);
   }
 });

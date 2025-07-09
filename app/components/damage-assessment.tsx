@@ -148,7 +148,7 @@ export function DamageAssessment({
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           
-          const result = await response.json();
+          const result = await response.json() as AssessmentResult;
           
           if (!result.success && result.error) {
             throw new Error(`AI Assessment Error: ${result.error} - ${result.details || ''}`);
@@ -227,7 +227,7 @@ export function DamageAssessment({
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      const result = await response.json();
+      const result = await response.json() as SearchResult;
       
       if (!result.success && result.error) {
         throw new Error(`Search Error: ${result.error} - ${result.details || ''}`);

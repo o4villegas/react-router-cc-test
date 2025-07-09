@@ -10,7 +10,7 @@ export function meta({}: Route.MetaArgs) {
 
 export function loader({ context }: Route.LoaderArgs) {
   return { 
-    message: context.cloudflare.env.VALUE_FROM_CLOUDFLARE,
+    message: (context as any).cloudflare.env.VALUE_FROM_CLOUDFLARE,
     apiEndpoint: "/api/assess-damage",
     searchEndpoint: "/api/knowledge-search"
   };
