@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
 import { loadConfig, type AppConfig } from "./config";
 import { createCacheService, createPerformanceMonitor, createImageOptimizer, type CacheService, type PerformanceMonitor, type ImageOptimizer } from "./cache";
+import { apiRateLimit, aiRateLimit } from "./middleware/rate-limit";
+import { productionCors, developmentCors } from "./middleware/cors";
 
 // Load configuration with environment detection
 let appConfig: AppConfig;
@@ -58,6 +60,16 @@ const logger = {
 };
 
 const app = new Hono();
+
+// Apply CORS middleware
+app.use('*', appConfig.app.environment === 'production' ? productionCors : developmentCors);
+
+// Apply rate limiting to API routes
+app.use('/api/*', apiRateLimit);
+
+// Apply AI-specific rate limiting to AI endpoints
+app.use('/api/assess-damage', aiRateLimit);
+app.use('/api/knowledge-search', aiRateLimit);
 
 // Image security validation utilities (using configuration)
 const IMAGE_MAGIC_BYTES = {
