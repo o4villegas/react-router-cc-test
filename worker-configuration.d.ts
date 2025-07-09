@@ -4,6 +4,9 @@
 declare namespace Cloudflare {
 	interface Env {
 		VALUE_FROM_CLOUDFLARE: "Hello from Hono/CF";
+		AI: any; // Workers AI binding
+		AUTORAG: any; // AutoRAG binding
+		R2_BUCKET: R2Bucket; // R2 bucket binding
 	}
 }
 interface Env extends Cloudflare.Env {}

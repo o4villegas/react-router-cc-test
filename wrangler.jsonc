@@ -42,5 +42,23 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#service-bindings
    */
   // "services": [{ "binding": "MY_SERVICE", "service": "my-service" }]
+  /**
+   * AI and AutoRAG Bindings for damage assessment
+   */
+  "ai": {
+    "binding": "AI"
+  },
+  "autorag": [
+    {
+      "binding": "AUTORAG",
+      "dataset_id": "REPLACE_WITH_YOUR_DATASET_ID"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "REPLACE_WITH_YOUR_BUCKET_NAME"
+    }
+  ],
   "upload_source_maps": true
 }
