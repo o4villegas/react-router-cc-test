@@ -254,8 +254,12 @@ export function DamageAssessment({
   }, [assessDamage]);
 
   return (
-    <main className="flex items-center justify-center pt-16 pb-4">
-      <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
+    <>
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+      <main id="main-content" className="flex items-center justify-center pt-16 pb-4">
+        <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
         <header className="flex flex-col items-center gap-4">
           <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Smart Damage Assessment
@@ -268,17 +272,28 @@ export function DamageAssessment({
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-6 px-4">
           {/* Image Upload Section */}
           <div className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2">
               📷 Upload Damage Photo
             </h2>
             <input 
+              id="image-upload"
               type="file" 
               accept="image/jpeg,image/png,image/webp" 
               onChange={handleImageUpload}
               className="w-full p-3 border rounded-lg dark:bg-gray-800 mb-4"
+              aria-describedby="upload-help upload-error"
+              aria-label="Upload damage photo for AI analysis"
             />
+            <div id="upload-help" className="sr-only">
+              Upload a photo of water damage. Accepted formats: JPEG, PNG, WebP. Maximum size: 10MB.
+            </div>
             {validationError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+              <div 
+                id="upload-error" 
+                className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800"
+                role="alert"
+                aria-live="polite"
+              >
                 <p className="text-red-700 dark:text-red-400 text-sm font-medium">
                   ❌ {validationError.message}
                 </p>
@@ -288,60 +303,87 @@ export function DamageAssessment({
               <div className="space-y-4">
                 <img 
                   src={imagePreview} 
-                  alt="Preview" 
+                  alt="Preview of uploaded damage photo" 
                   className="w-full h-64 object-cover rounded-lg border"
                 />
                 <button 
                   onClick={assessDamage} 
                   disabled={loading || validationError !== null}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  aria-describedby="assess-help"
+                  aria-label={loading ? "Analyzing image with AI" : "Start damage assessment"}
                 >
                   {loading ? "🔍 Analyzing with AI..." : "🚀 Assess Damage"}
                 </button>
+                <div id="assess-help" className="sr-only">
+                  {loading ? "Assessment in progress. Please wait." : "Click to analyze the uploaded image for water damage using AI."}
+                </div>
               </div>
             )}
           </div>
 
           {/* Knowledge Base Search */}
           <div className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2">
               📚 Search Knowledge Base
             </h2>
             <div className="flex gap-2 mb-4">
+              <label htmlFor="search-input" className="sr-only">
+                Search knowledge base
+              </label>
               <input
+                id="search-input"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search IICRC standards, procedures..."
-                className="flex-1 p-3 border rounded-lg dark:bg-gray-800"
-                onKeyPress={(e) => e.key === 'Enter' && searchKnowledgeBase()}
+                className="flex-1 p-3 border rounded-lg dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    searchKnowledgeBase();
+                  }
+                }}
+                aria-describedby="search-help"
+                aria-label="Search industry standards and procedures"
               />
               <button
                 onClick={searchKnowledgeBase}
-                className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                aria-label="Search knowledge base"
+                disabled={!searchQuery.trim()}
               >
                 🔍
               </button>
+            </div>
+            <div id="search-help" className="sr-only">
+              Search for IICRC standards, water damage procedures, and industry best practices. Press Enter or click search button to search.
             </div>
             
             {searchResults && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {searchResults.success ? (
                   <>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Found {searchResults.total_results} results
+                    <p className="text-sm text-gray-600 dark:text-gray-400" aria-live="polite">
+                      Found {searchResults.total_results} results for "{searchResults.query}"
                     </p>
-                    {searchResults.results.map((result, idx) => (
-                      <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                        <div className="font-medium">{result.metadata?.title || `Document ${idx + 1}`}</div>
-                        <div className="text-gray-600 dark:text-gray-400 mt-1">
-                          {result.text?.substring(0, 100)}...
+                    <div role="list" aria-label="Search results">
+                      {searchResults.results.map((result, idx) => (
+                        <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm" role="listitem">
+                          <div className="font-medium">{result.metadata?.title || `Document ${idx + 1}`}</div>
+                          <div className="text-gray-600 dark:text-gray-400 mt-1">
+                            {result.text?.substring(0, 100)}...
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </>
                 ) : (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                  <div 
+                    className="p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800"
+                    role="alert"
+                    aria-live="polite"
+                  >
                     <p className="text-red-700 dark:text-red-400 text-sm font-medium">
                       ❌ Search Error: {searchResults.error}
                     </p>
@@ -355,10 +397,14 @@ export function DamageAssessment({
         {/* Assessment Results */}
         <AIErrorBoundary onRetry={handleRetry}>
         {assessment && (
-          <div className="w-full rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
+          <div 
+            className="w-full rounded-3xl border border-gray-200 p-6 dark:border-gray-700"
+            role="region"
+            aria-labelledby="results-heading"
+          >
             {assessment.success ? (
               <div className="space-y-6">
-                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                <h2 id="results-heading" className="text-2xl font-semibold flex items-center gap-2">
                   📋 Assessment Results
                 </h2>
                 
@@ -379,16 +425,18 @@ export function DamageAssessment({
                       </h3>
                       <div className="space-y-2">
                         {assessment.industry_sources.length > 0 ? (
-                          assessment.industry_sources.map((source, idx) => (
-                            <div key={idx} className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-sm">
-                              <div className="font-medium">
-                                {source.metadata?.title || `Reference ${idx + 1}`}
+                          <div role="list" aria-label="Industry sources used">
+                            {assessment.industry_sources.map((source, idx) => (
+                              <div key={idx} className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-sm" role="listitem">
+                                <div className="font-medium">
+                                  {source.metadata?.title || `Reference ${idx + 1}`}
+                                </div>
+                                <div className="text-gray-600 dark:text-gray-400">
+                                  Relevance: {Math.round((source.score || 0.8) * 100)}%
+                                </div>
                               </div>
-                              <div className="text-gray-600 dark:text-gray-400">
-                                Relevance: {Math.round((source.score || 0.8) * 100)}%
-                              </div>
-                            </div>
-                          ))
+                            ))}
+                          </div>
                         ) : (
                           <p className="text-gray-500 italic">No specific industry sources matched</p>
                         )}
@@ -412,24 +460,33 @@ export function DamageAssessment({
                   <div className="flex items-center gap-4">
                     <span className="text-sm font-medium">Confidence Score:</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-32 bg-gray-200 rounded-full h-2 dark:bg-gray-700">
+                      <div 
+                        className="w-32 bg-gray-200 rounded-full h-2 dark:bg-gray-700"
+                        role="progressbar"
+                        aria-valuenow={Math.round(assessment.confidence_score * 100)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`Assessment confidence: ${Math.round(assessment.confidence_score * 100)} percent`}
+                      >
                         <div 
                           className="bg-green-600 h-2 rounded-full transition-all duration-300" 
                           style={{ width: `${assessment.confidence_score * 100}%` }}
                         ></div>
                       </div>
-                      <span className="text-sm font-bold">
+                      <span className="text-sm font-bold" aria-hidden="true">
                         {Math.round(assessment.confidence_score * 100)}%
                       </span>
                     </div>
                   </div>
                   <div className="text-sm text-gray-500">
-                    {new Date(assessment.timestamp).toLocaleString()}
+                    <time dateTime={assessment.timestamp}>
+                      {new Date(assessment.timestamp).toLocaleString()}
+                    </time>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8">
+              <div className="text-center py-8" role="alert" aria-live="polite">
                 <div className="text-red-600 text-lg font-medium mb-2">
                   ❌ Assessment Failed
                 </div>
@@ -438,7 +495,8 @@ export function DamageAssessment({
                 </p>
                 <button
                   onClick={handleRetry}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                  aria-label="Retry damage assessment"
                 >
                   Try Again
                 </button>
@@ -447,7 +505,8 @@ export function DamageAssessment({
           </div>
         )}
         </AIErrorBoundary>
-      </div>
-    </main>
+        </div>
+      </main>
+    </>
   );
 }
