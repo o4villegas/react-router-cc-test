@@ -3,6 +3,13 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 
+// Simple server-side logger for React Router SSR
+const logger = {
+  error: (message: string, data?: any) => {
+    console.error(`[${new Date().toISOString()}] SSR ERROR: ${message}`, data);
+  }
+};
+
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
@@ -22,7 +29,7 @@ export default async function handleRequest(
         // errors encountered during initial shell rendering since they'll
         // reject and get logged in handleDocumentRequest.
         if (shellRendered) {
-          console.error(error);
+          logger.error('Streaming rendering error', error);
         }
       },
     },

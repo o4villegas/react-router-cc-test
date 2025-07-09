@@ -1,4 +1,17 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { AIErrorBoundary } from "./error-boundary";
+import { logger } from "../utils/logger";
+
+// Image validation constants
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_DIMENSIONS = { width: 4096, height: 4096 };
+const MIN_DIMENSIONS = { width: 100, height: 100 };
+
+interface ValidationError {
+  type: 'size' | 'type' | 'dimensions' | 'corrupt';
+  message: string;
+}
 
 interface AssessmentResult {
   success: boolean;
@@ -16,6 +29,7 @@ interface SearchResult {
   query: string;
   results: any[];
   total_results: number;
+  error?: string;
 }
 
 export function DamageAssessment({ 
@@ -29,20 +43,90 @@ export function DamageAssessment({
   const [assessment, setAssessment] = useState<AssessmentResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>("");
+  const [validationError, setValidationError] = useState<ValidationError | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target?.result as string);
-      reader.readAsDataURL(file);
-    }
+  const validateImage = (file: File): Promise<ValidationError | null> => {
+    return new Promise((resolve) => {
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        resolve({
+          type: 'size',
+          message: `File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB. Current size: ${(file.size / (1024 * 1024)).toFixed(1)}MB`
+        });
+        return;
+      }
+
+      // Check file type
+      if (!ALLOWED_TYPES.includes(file.type)) {
+        resolve({
+          type: 'type',
+          message: `Only JPEG, PNG, and WebP images are allowed. Current type: ${file.type}`
+        });
+        return;
+      }
+
+      // Check image dimensions
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        if (img.width > MAX_DIMENSIONS.width || img.height > MAX_DIMENSIONS.height) {
+          resolve({
+            type: 'dimensions',
+            message: `Image dimensions must be less than ${MAX_DIMENSIONS.width}x${MAX_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+          });
+          return;
+        }
+        
+        if (img.width < MIN_DIMENSIONS.width || img.height < MIN_DIMENSIONS.height) {
+          resolve({
+            type: 'dimensions',
+            message: `Image dimensions must be at least ${MIN_DIMENSIONS.width}x${MIN_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+          });
+          return;
+        }
+        
+        resolve(null); // Valid image
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve({
+          type: 'corrupt',
+          message: 'Unable to load image. File may be corrupted or invalid.'
+        });
+      };
+      
+      img.src = url;
+    });
   };
 
-  const assessDamage = async () => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setValidationError(null);
+    setSelectedImage(null);
+    setImagePreview("");
+    
+    if (!file) return;
+    
+    const validationError = await validateImage(file);
+    if (validationError) {
+      setValidationError(validationError);
+      return;
+    }
+    
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const assessDamage = useCallback(async () => {
     if (!selectedImage) return;
     
     setLoading(true);
@@ -51,23 +135,77 @@ export function DamageAssessment({
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const base64 = e.target?.result as string;
-        
-        const response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: base64 })
-        });
-        
-        const result = await response.json();
-        setAssessment(result);
+        try {
+          const base64 = e.target?.result as string;
+          
+          const response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64 })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
+          const result = await response.json();
+          
+          if (!result.success && result.error) {
+            throw new Error(`AI Assessment Error: ${result.error} - ${result.details || ''}`);
+          }
+          
+          setAssessment(result);
+          setRetryCount(0); // Reset retry count on success
+        } catch (error) {
+          logger.aiError('image assessment', error, 'DamageAssessment');
+          
+          // Enhanced error handling with specific error types
+          let errorMessage = 'Assessment failed';
+          let errorDetails = '';
+          
+          if (error instanceof Error) {
+            if (error.message.includes('HTTP 429')) {
+              errorMessage = 'Rate limit exceeded';
+              errorDetails = 'Too many requests. Please wait a moment and try again.';
+            } else if (error.message.includes('HTTP 500')) {
+              errorMessage = 'AI service error';
+              errorDetails = 'The AI service is temporarily unavailable. Please try again.';
+            } else if (error.message.includes('Failed to fetch')) {
+              errorMessage = 'Network error';
+              errorDetails = 'Unable to connect to the assessment service. Check your internet connection.';
+            } else if (error.message.includes('AI Assessment Error')) {
+              errorMessage = 'AI processing error';
+              errorDetails = error.message;
+            } else {
+              errorMessage = 'Unexpected error';
+              errorDetails = error.message;
+            }
+          }
+          
+          setAssessment({
+            success: false,
+            error: errorMessage,
+            details: errorDetails,
+            vision_analysis: '',
+            industry_sources: [],
+            enhanced_assessment: '',
+            confidence_score: 0,
+            timestamp: new Date().toISOString()
+          });
+        }
       };
+      
+      reader.onerror = () => {
+        throw new Error('Failed to read image file. The file may be corrupted.');
+      };
+      
       reader.readAsDataURL(selectedImage);
     } catch (error) {
-      console.error('Assessment failed:', error);
+      logger.error('Failed to read image file', error, 'DamageAssessment');
       setAssessment({
         success: false,
-        error: 'Network error',
+        error: 'File reading error',
+        details: error instanceof Error ? error.message : 'Unknown error',
         vision_analysis: '',
         industry_sources: [],
         enhanced_assessment: '',
@@ -77,19 +215,43 @@ export function DamageAssessment({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedImage, apiEndpoint]);
 
-  const searchKnowledgeBase = async () => {
+  const searchKnowledgeBase = useCallback(async () => {
     if (!searchQuery.trim()) return;
     
     try {
       const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const result = await response.json();
+      
+      if (!result.success && result.error) {
+        throw new Error(`Search Error: ${result.error} - ${result.details || ''}`);
+      }
+      
       setSearchResults(result);
     } catch (error) {
-      console.error('Search failed:', error);
+      logger.apiError('knowledge search', error, 'DamageAssessment');
+      
+      // Set error state for search results
+      setSearchResults({
+        success: false,
+        query: searchQuery,
+        results: [],
+        total_results: 0,
+        error: error instanceof Error ? error.message : 'Search failed'
+      });
     }
-  };
+  }, [searchQuery, searchEndpoint]);
+
+  const handleRetry = useCallback(() => {
+    setRetryCount(prev => prev + 1);
+    assessDamage();
+  }, [assessDamage]);
 
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
@@ -111,10 +273,17 @@ export function DamageAssessment({
             </h2>
             <input 
               type="file" 
-              accept="image/*" 
+              accept="image/jpeg,image/png,image/webp" 
               onChange={handleImageUpload}
               className="w-full p-3 border rounded-lg dark:bg-gray-800 mb-4"
             />
+            {validationError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                <p className="text-red-700 dark:text-red-400 text-sm font-medium">
+                  ❌ {validationError.message}
+                </p>
+              </div>
+            )}
             {imagePreview && (
               <div className="space-y-4">
                 <img 
@@ -124,7 +293,7 @@ export function DamageAssessment({
                 />
                 <button 
                   onClick={assessDamage} 
-                  disabled={loading}
+                  disabled={loading || validationError !== null}
                   className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {loading ? "🔍 Analyzing with AI..." : "🚀 Assess Damage"}
@@ -157,23 +326,34 @@ export function DamageAssessment({
             
             {searchResults && (
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Found {searchResults.total_results} results
-                </p>
-                {searchResults.results.map((result, idx) => (
-                  <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
-                    <div className="font-medium">{result.metadata?.title || `Document ${idx + 1}`}</div>
-                    <div className="text-gray-600 dark:text-gray-400 mt-1">
-                      {result.text?.substring(0, 100)}...
-                    </div>
+                {searchResults.success ? (
+                  <>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Found {searchResults.total_results} results
+                    </p>
+                    {searchResults.results.map((result, idx) => (
+                      <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                        <div className="font-medium">{result.metadata?.title || `Document ${idx + 1}`}</div>
+                        <div className="text-gray-600 dark:text-gray-400 mt-1">
+                          {result.text?.substring(0, 100)}...
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800">
+                    <p className="text-red-700 dark:text-red-400 text-sm font-medium">
+                      ❌ Search Error: {searchResults.error}
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
         </div>
 
         {/* Assessment Results */}
+        <AIErrorBoundary onRetry={handleRetry}>
         {assessment && (
           <div className="w-full rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
             {assessment.success ? (
@@ -253,13 +433,20 @@ export function DamageAssessment({
                 <div className="text-red-600 text-lg font-medium mb-2">
                   ❌ Assessment Failed
                 </div>
-                <p className="text-gray-600 dark:text-gray-400">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   {assessment.error}: {assessment.details}
                 </p>
+                <button
+                  onClick={handleRetry}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Try Again
+                </button>
               </div>
             )}
           </div>
         )}
+        </AIErrorBoundary>
       </div>
     </main>
   );

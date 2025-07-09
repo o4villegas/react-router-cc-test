@@ -1,6 +1,19 @@
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
 
+// Simple server-side logger for Cloudflare Workers
+const logger = {
+  error: (message: string, data?: any) => {
+    console.error(`[${new Date().toISOString()}] ERROR: ${message}`, data);
+  },
+  info: (message: string, data?: any) => {
+    console.log(`[${new Date().toISOString()}] INFO: ${message}`, data);
+  },
+  warn: (message: string, data?: any) => {
+    console.warn(`[${new Date().toISOString()}] WARN: ${message}`, data);
+  }
+};
+
 const app = new Hono();
 
 // Enhanced API routes for damage assessment with RAG
@@ -49,7 +62,7 @@ app.post("/api/assess-damage", async (c) => {
     });
 
   } catch (error) {
-    console.error('Assessment failed:', error);
+    logger.error('AI assessment failed', { error: error.message, stack: error.stack });
     return c.json({ 
       success: false, 
       error: "Assessment failed", 
