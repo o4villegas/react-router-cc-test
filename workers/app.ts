@@ -1,22 +1,57 @@
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
+import { loadConfig, type AppConfig } from "./config";
 
-// Simple server-side logger for Cloudflare Workers
+// Load configuration with environment detection
+let appConfig: AppConfig;
+try {
+  appConfig = loadConfig();
+} catch (error) {
+  console.error('Failed to load configuration:', error);
+  throw error;
+}
+
+// Enhanced logger with configuration-driven behavior
 const logger = {
   error: (message: string, data?: any) => {
-    console.error(`[${new Date().toISOString()}] ERROR: ${message}`, data);
+    if (appConfig.logging.level === 'error' || appConfig.logging.level === 'warn' || 
+        appConfig.logging.level === 'info' || appConfig.logging.level === 'debug') {
+      const logData = appConfig.logging.enable_structured_logging ? 
+        { level: 'ERROR', message, data, timestamp: new Date().toISOString() } : 
+        `[${new Date().toISOString()}] ERROR: ${message}`;
+      console.error(logData, appConfig.logging.enable_structured_logging ? undefined : data);
+    }
   },
   info: (message: string, data?: any) => {
-    console.log(`[${new Date().toISOString()}] INFO: ${message}`, data);
+    if (appConfig.logging.level === 'info' || appConfig.logging.level === 'debug') {
+      const logData = appConfig.logging.enable_structured_logging ? 
+        { level: 'INFO', message, data, timestamp: new Date().toISOString() } : 
+        `[${new Date().toISOString()}] INFO: ${message}`;
+      console.log(logData, appConfig.logging.enable_structured_logging ? undefined : data);
+    }
   },
   warn: (message: string, data?: any) => {
-    console.warn(`[${new Date().toISOString()}] WARN: ${message}`, data);
+    if (appConfig.logging.level === 'warn' || appConfig.logging.level === 'info' || 
+        appConfig.logging.level === 'debug') {
+      const logData = appConfig.logging.enable_structured_logging ? 
+        { level: 'WARN', message, data, timestamp: new Date().toISOString() } : 
+        `[${new Date().toISOString()}] WARN: ${message}`;
+      console.warn(logData, appConfig.logging.enable_structured_logging ? undefined : data);
+    }
+  },
+  debug: (message: string, data?: any) => {
+    if (appConfig.logging.level === 'debug') {
+      const logData = appConfig.logging.enable_structured_logging ? 
+        { level: 'DEBUG', message, data, timestamp: new Date().toISOString() } : 
+        `[${new Date().toISOString()}] DEBUG: ${message}`;
+      console.debug(logData, appConfig.logging.enable_structured_logging ? undefined : data);
+    }
   }
 };
 
 const app = new Hono();
 
-// Image security validation utilities
+// Image security validation utilities (using configuration)
 const IMAGE_MAGIC_BYTES = {
   jpeg: [0xFF, 0xD8, 0xFF],
   png: [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A],
@@ -24,8 +59,9 @@ const IMAGE_MAGIC_BYTES = {
   gif: [0x47, 0x49, 0x46, 0x38], // GIF8 header
 };
 
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_IMAGE_DIMENSIONS = 8192; // Maximum width/height in pixels
+// Configuration-driven constants
+const ALLOWED_MIME_TYPES = appConfig.image.allowed_types;
+const MAX_IMAGE_DIMENSIONS = appConfig.api.limits.max_dimensions;
 
 function validateImageSignature(buffer: Uint8Array): { valid: boolean; detectedType: string | null; error?: string } {
   if (buffer.length < 8) {
@@ -191,12 +227,12 @@ app.post("/api/assess-damage", async (c) => {
       }, 400);
     }
 
-    // Validate size (50MB limit for request)
-    if (image.length > 50 * 1024 * 1024) {
+    // Validate size (using configured limit)
+    if (image.length > appConfig.api.limits.max_file_size) {
       return c.json({ 
         success: false, 
         error: "Image too large",
-        details: `Image size ${image.length} bytes exceeds limit of 50MB` 
+        details: `Image size ${image.length} bytes exceeds limit of ${Math.round(appConfig.api.limits.max_file_size / (1024 * 1024))}MB` 
       }, 413);
     }
 
@@ -223,11 +259,11 @@ app.post("/api/assess-damage", async (c) => {
     }
 
     // Validate decoded image size (prevent memory issues)
-    if (imageBuffer.length > 100 * 1024 * 1024) {
+    if (imageBuffer.length > appConfig.api.limits.max_decoded_size) {
       return c.json({ 
         success: false, 
         error: "Decoded image too large",
-        details: `Decoded image size ${imageBuffer.length} bytes exceeds limit of 100MB` 
+        details: `Decoded image size ${imageBuffer.length} bytes exceeds limit of ${Math.round(appConfig.api.limits.max_decoded_size / (1024 * 1024))}MB` 
       }, 413);
     }
 
@@ -272,7 +308,7 @@ app.post("/api/assess-damage", async (c) => {
     });
     
     // Step 1: Vision AI Analysis using LLaVA (use sanitized buffer)
-    const visionResponse = await (c.env as any).AI.run('@cf/llava-hf/llava-1.5-7b-hf', {
+    const visionResponse = await (c.env as any).AI.run(appConfig.ai.vision_model, {
       image: Array.from(sanitizedBuffer),
       prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
     });
@@ -281,12 +317,12 @@ app.post("/api/assess-damage", async (c) => {
     let ragResponse = { response: '', data: [] };
     try {
       // Check if AI binding and autorag method exist
-      if ((c.env as any).AI && typeof (c.env as any).AI.autorag === 'function') {
-        ragResponse = await (c.env as any).AI.autorag("auto-inspect-rag").aiSearch({
+      if ((c.env as any).AI && typeof (c.env as any).AI.autorag === 'function' && appConfig.ai.enable_autorag) {
+        ragResponse = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
           query: `water damage ${visionResponse.description} remediation guidelines IICRC standards`
         });
       } else {
-        logger.warn('AutoRAG not available, continuing with vision-only analysis');
+        logger.warn('AutoRAG not available or disabled, continuing with vision-only analysis');
       }
     } catch (error) {
       logger.error('AutoRAG search failed', { error: (error as Error).message, stack: (error as Error).stack });
@@ -294,7 +330,7 @@ app.post("/api/assess-damage", async (c) => {
     }
 
     // Step 3: Combine Vision + RAG for Enhanced Assessment
-    const enhancedAssessment = await (c.env as any).AI.run('@cf/meta/llama-3.2-3b-instruct', {
+    const enhancedAssessment = await (c.env as any).AI.run(appConfig.ai.language_model, {
       messages: [
         {
           role: "system", 
@@ -313,7 +349,7 @@ app.post("/api/assess-damage", async (c) => {
       industry_sources: ragResponse.data || [],
       autorag_response: ragResponse.response || null,
       enhanced_assessment: enhancedAssessment.response,
-      confidence_score: visionResponse.confidence || 0.85,
+      confidence_score: visionResponse.confidence || appConfig.ai.confidence_threshold,
       timestamp: new Date().toISOString()
     });
 
@@ -385,11 +421,11 @@ app.get("/api/knowledge-search", async (c) => {
     }, 400);
   }
 
-  if (query.length > 1000) {
+  if (query.length > appConfig.api.limits.max_query_length) {
     return c.json({ 
       success: false, 
       error: "Query too long", 
-      details: "Query must be less than 1000 characters" 
+      details: `Query must be less than ${appConfig.api.limits.max_query_length} characters` 
     }, 400);
   }
   
@@ -413,7 +449,7 @@ app.get("/api/knowledge-search", async (c) => {
     }
     
     // Use the new AutoRAG dataset with aiSearch method
-    const results = await (c.env as any).AI.autorag("auto-inspect-rag").aiSearch({
+    const results = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
       query: query
     });
     

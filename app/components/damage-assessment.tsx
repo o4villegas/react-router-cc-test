@@ -1,12 +1,7 @@
 import { useState, useCallback } from "react";
 import { AIErrorBoundary } from "./error-boundary";
 import { logger } from "../utils/logger";
-
-// Image validation constants
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_DIMENSIONS = { width: 4096, height: 4096 };
-const MIN_DIMENSIONS = { width: 100, height: 100 };
+import { type ClientConfig } from "../utils/client-config";
 
 interface ValidationError {
   type: 'size' | 'type' | 'dimensions' | 'corrupt';
@@ -35,10 +30,12 @@ interface SearchResult {
 
 export function DamageAssessment({ 
   apiEndpoint, 
-  searchEndpoint 
+  searchEndpoint,
+  config
 }: { 
   apiEndpoint: string;
   searchEndpoint: string;
+  config: ClientConfig;
 }) {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [assessment, setAssessment] = useState<AssessmentResult | null>(null);
@@ -52,19 +49,19 @@ export function DamageAssessment({
   const validateImage = (file: File): Promise<ValidationError | null> => {
     return new Promise((resolve) => {
       // Check file size
-      if (file.size > MAX_FILE_SIZE) {
+      if (file.size > config.image.max_file_size) {
         resolve({
           type: 'size',
-          message: `File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB. Current size: ${(file.size / (1024 * 1024)).toFixed(1)}MB`
+          message: `File size must be less than ${config.image.max_file_size / (1024 * 1024)}MB. Current size: ${(file.size / (1024 * 1024)).toFixed(1)}MB`
         });
         return;
       }
 
       // Check file type
-      if (!ALLOWED_TYPES.includes(file.type)) {
+      if (!config.image.allowed_types.includes(file.type)) {
         resolve({
           type: 'type',
-          message: `Only JPEG, PNG, and WebP images are allowed. Current type: ${file.type}`
+          message: `Only ${config.image.allowed_types.join(', ')} images are allowed. Current type: ${file.type}`
         });
         return;
       }
@@ -88,6 +85,27 @@ export function DamageAssessment({
         resolve({
           type: 'type',
           message: 'File name contains invalid characters'
+        });
+        return;
+      }
+
+      // Validate filename length
+      if (file.name.length > config.security.max_filename_length) {
+        resolve({
+          type: 'type',
+          message: `Filename too long. Maximum length: ${config.security.max_filename_length} characters`
+        });
+        return;
+      }
+
+      // Check for blocked extensions
+      const hasBlockedExtension = config.security.blocked_extensions.some(ext => 
+        fileName.endsWith(ext.toLowerCase())
+      );
+      if (hasBlockedExtension) {
+        resolve({
+          type: 'type',
+          message: 'File extension is not allowed for security reasons'
         });
         return;
       }
@@ -133,18 +151,18 @@ export function DamageAssessment({
         img.onload = () => {
           URL.revokeObjectURL(url);
           
-          if (img.width > MAX_DIMENSIONS.width || img.height > MAX_DIMENSIONS.height) {
+          if (img.width > config.image.max_dimensions.width || img.height > config.image.max_dimensions.height) {
             resolve({
               type: 'dimensions',
-              message: `Image dimensions must be less than ${MAX_DIMENSIONS.width}x${MAX_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+              message: `Image dimensions must be less than ${config.image.max_dimensions.width}x${config.image.max_dimensions.height}px. Current: ${img.width}x${img.height}px`
             });
             return;
           }
           
-          if (img.width < MIN_DIMENSIONS.width || img.height < MIN_DIMENSIONS.height) {
+          if (img.width < config.image.min_dimensions.width || img.height < config.image.min_dimensions.height) {
             resolve({
               type: 'dimensions',
-              message: `Image dimensions must be at least ${MIN_DIMENSIONS.width}x${MIN_DIMENSIONS.height}px. Current: ${img.width}x${img.height}px`
+              message: `Image dimensions must be at least ${config.image.min_dimensions.width}x${config.image.min_dimensions.height}px. Current: ${img.width}x${img.height}px`
             });
             return;
           }
@@ -209,7 +227,7 @@ export function DamageAssessment({
           
           // Create abort controller for timeout
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), config.api.timeout.damage_assessment);
           
           const response = await fetch(apiEndpoint, {
             method: 'POST',
@@ -311,7 +329,7 @@ export function DamageAssessment({
     try {
       // Create abort controller for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout for search
+      const timeoutId = setTimeout(() => controller.abort(), config.api.timeout.knowledge_search);
       
       const response = await fetch(`${searchEndpoint}?q=${encodeURIComponent(searchQuery)}`, {
         signal: controller.signal
@@ -382,14 +400,14 @@ export function DamageAssessment({
             <input 
               id="image-upload"
               type="file" 
-              accept="image/jpeg,image/png,image/webp" 
+              accept={config.image.allowed_types.join(',')} 
               onChange={handleImageUpload}
               className="w-full p-3 border rounded-lg dark:bg-gray-800 mb-4"
               aria-describedby="upload-help upload-error"
               aria-label="Upload damage photo for AI analysis"
             />
             <div id="upload-help" className="sr-only">
-              Upload a photo of water damage. Accepted formats: JPEG, PNG, WebP. Maximum size: 10MB.
+              Upload a photo of water damage. Accepted formats: {config.image.allowed_types.join(', ')}. Maximum size: {Math.round(config.image.max_file_size / (1024 * 1024))}MB.
             </div>
             {validationError && (
               <div 
