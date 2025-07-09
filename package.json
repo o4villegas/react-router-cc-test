@@ -28,13 +28,18 @@
     "@cloudflare/workers-types": "^4.20250425.0",
     "@react-router/dev": "7.6.3",
     "@tailwindcss/vite": "4.1.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "24.0.4",
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
+    "jsdom": "^26.1.0",
     "tailwindcss": "4.1.1",
     "typescript": "5.8.3",
     "vite": "^6.0.0",
     "vite-tsconfig-paths": "5.1.4",
+    "vitest": "^3.2.4",
     "wrangler": "4.21.x"
   },
   "scripts": {
@@ -43,6 +48,10 @@
     "deploy": "npm run build && wrangler deploy",
     "dev": "react-router dev",
     "preview": "npm run build && vite preview",
-    "typecheck": "npm run cf-typegen && react-router typegen && tsc -b"
+    "typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui"
   }
 }
