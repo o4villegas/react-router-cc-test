@@ -252,12 +252,23 @@ app.post("/api/assess-damage", async (c) => {
       }, 400);
     }
 
-    // Validate size (using configured limit)
+    // Early size validation (before expensive base64 decoding)
+    // Estimate decoded size: base64 is ~1.33x larger than binary data
+    const estimatedDecodedSize = Math.floor(image.length * 0.75);
+    
     if (image.length > appConfig.api.limits.max_file_size) {
       return c.json({ 
         success: false, 
         error: "Image too large",
-        details: `Image size ${image.length} bytes exceeds limit of ${Math.round(appConfig.api.limits.max_file_size / (1024 * 1024))}MB` 
+        details: `Image size ${Math.round(image.length / (1024 * 1024) * 100) / 100}MB exceeds limit of ${Math.round(appConfig.api.limits.max_file_size / (1024 * 1024))}MB. Please compress your image and try again.` 
+      }, 413);
+    }
+    
+    if (estimatedDecodedSize > appConfig.api.limits.max_decoded_size) {
+      return c.json({ 
+        success: false, 
+        error: "Image too large when decoded",
+        details: `Estimated decoded size ${Math.round(estimatedDecodedSize / (1024 * 1024) * 100) / 100}MB exceeds limit of ${Math.round(appConfig.api.limits.max_decoded_size / (1024 * 1024))}MB. Please use a smaller image.` 
       }, 413);
     }
 
@@ -271,11 +282,39 @@ app.post("/api/assess-damage", async (c) => {
       }, 400);
     }
 
-    // Safe base64 decoding
+    // CPU-intensive base64 decoding with timeout protection
     let imageBuffer;
     try {
+      // Log before CPU-intensive operation
+      logger.debug('Starting base64 decode', { 
+        base64Size: base64Data.length,
+        estimatedSize: estimatedDecodedSize 
+      });
+      
       imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+      
+      // Log successful decode
+      logger.debug('Base64 decode successful', { 
+        actualSize: imageBuffer.length,
+        estimatedSize: estimatedDecodedSize 
+      });
     } catch (error) {
+      logger.error('Base64 decode failed', { 
+        error: (error as Error).message,
+        base64Size: base64Data.length 
+      });
+      
+      // Check if this might be a CPU limit error
+      if ((error as Error).message?.includes('exceeded') || 
+          (error as Error).message?.includes('timeout') ||
+          (error as Error).message?.includes('limit')) {
+        return c.json({ 
+          success: false, 
+          error: "Image too large to process",
+          details: "The image is too large and caused a processing timeout. Please use a smaller image (under 2MB recommended)." 
+        }, 413);
+      }
+      
       return c.json({ 
         success: false, 
         error: "Invalid base64 data",
@@ -526,6 +565,10 @@ app.post("/api/assess-damage", async (c) => {
         statusCode = 400;
         errorMessage = "Image validation failed";
         errorDetails = "The image file does not match its declared format";
+      } else if (error.message.includes('CPU') || error.message.includes('exceeded')) {
+        statusCode = 413;
+        errorMessage = "Image too large to process";
+        errorDetails = "The image is too large and caused a processing timeout. Please use a smaller image (under 2MB recommended).";
       } else {
         errorDetails = error.message;
       }

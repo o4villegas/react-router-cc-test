@@ -53,7 +53,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
 
   image: {
     allowed_types: ['image/jpeg', 'image/png', 'image/webp'],
-    max_file_size: 10 * 1024 * 1024, // 10MB for frontend
+    max_file_size: 5 * 1024 * 1024, // 5MB for frontend (matches backend limit)
     max_dimensions: { width: 4096, height: 4096 },
     min_dimensions: { width: 100, height: 100 },
   },

@@ -97,10 +97,10 @@ const DEFAULT_CONFIG: AppConfig = {
       ai_processing: 60000,     // 60 seconds
     },
     limits: {
-      max_file_size: 50 * 1024 * 1024,    // 50MB
-      max_decoded_size: 100 * 1024 * 1024, // 100MB
-      max_dimensions: 8192,                 // 8192px
-      max_query_length: 1000,               // 1000 characters
+      max_file_size: 5 * 1024 * 1024,     // 5MB (reduced to prevent CPU timeouts)
+      max_decoded_size: 10 * 1024 * 1024, // 10MB (reduced to prevent CPU timeouts)
+      max_dimensions: 4096,                // 4096px (reduced for processing efficiency)
+      max_query_length: 1000,              // 1000 characters
     },
     retry: {
       max_attempts: 3,
