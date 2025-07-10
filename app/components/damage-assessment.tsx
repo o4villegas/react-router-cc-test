@@ -531,22 +531,45 @@ export function DamageAssessment({
       <main id="main-content" className="flex items-center justify-center pt-16 pb-4">
         <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
         <header className="flex flex-col items-center gap-6">
-          <h1 className="text-6xl font-bold text-center" style={{ textShadow: '0 0 10px rgba(255, 107, 53, 0.3)' }}>
-            <span style={{ color: 'var(--text-primary)' }}>Aqua</span>
-            <span style={{ color: 'var(--accent-orange)' }}> Inspect</span>
-            <span style={{ color: 'var(--text-primary)' }}> Vision</span>
+          <h1 className="text-6xl font-bold text-center aqua-inspect-title">
+            <span>Aqua</span>
+            <span className="aqua-inspect-accent"> Inspect</span>
+            <span> Vision</span>
           </h1>
-          <p className="text-center max-w-2xl text-lg" style={{ color: 'var(--text-secondary)' }}>
+          <p className="text-center max-w-2xl text-lg" style={{ color: '#a0a0a0' }}>
             Professional AI-powered water damage assessment with computer vision and industry expertise
           </p>
         </header>
 
-        <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-6 px-4">
-          {/* Image Upload Section */}
-          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', boxShadow: 'var(--shadow-default)' }}>
-            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              📷 Upload Damage Photo
-            </h2>
+        {/* Step Indicators */}
+        <div className="flex justify-center mb-8">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center">
+              <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">1</div>
+              <span className="ml-2 text-white font-medium">Upload</span>
+            </div>
+            <div className="w-8 h-0.5 bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${assessment ? 'bg-orange-500 text-white' : 'bg-gray-600 text-gray-400'}`}>2</div>
+              <span className={`ml-2 font-medium ${assessment ? 'text-white' : 'text-gray-400'}`}>Analysis</span>
+            </div>
+            <div className="w-8 h-0.5 bg-gray-600"></div>
+            <div className="flex items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${assessment ? 'bg-orange-500 text-white' : 'bg-gray-600 text-gray-400'}`}>3</div>
+              <span className={`ml-2 font-medium ${assessment ? 'text-white' : 'text-gray-400'}`}>Chat</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Step-by-Step Flow */}
+        <div className="w-full max-w-4xl mx-auto space-y-8 px-4">
+          
+          {/* Step 1: Image Upload - Always Visible */}
+          <div className="aqua-card rounded-2xl p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">1</div>
+              <h2 className="text-2xl font-semibold text-white">Upload Damage Photo</h2>
+            </div>
             <input 
               id="image-upload"
               type="file" 
@@ -554,9 +577,9 @@ export function DamageAssessment({
               onChange={handleImageUpload}
               className="w-full mb-4 p-3 rounded-lg border transition-all duration-300"
               style={{ 
-                backgroundColor: 'var(--bg-secondary)', 
-                borderColor: 'var(--border-primary)', 
-                color: 'var(--text-primary)' 
+                backgroundColor: '#1a1a1a', 
+                borderColor: '#333333', 
+                color: '#ffffff' 
               }}
               aria-describedby="upload-help upload-error"
               aria-label="Upload damage photo for AI analysis"
@@ -596,13 +619,7 @@ export function DamageAssessment({
                 <button 
                   onClick={assessDamage} 
                   disabled={loading || validationError !== null}
-                  className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
-                  style={{ 
-                    background: loading || validationError ? 'var(--bg-secondary)' : 'linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-dark) 100%)',
-                    color: 'var(--text-primary)',
-                    border: 'none',
-                    boxShadow: loading || validationError ? 'none' : 'var(--shadow-default)'
-                  }}
+                  className="aqua-button w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
                   aria-describedby="assess-help"
                   aria-label={loading ? "Analyzing image with AI" : "Start damage assessment"}
                 >
@@ -613,17 +630,13 @@ export function DamageAssessment({
                 {loading && (
                   <div className="w-full space-y-3">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="font-medium" style={{ color: 'var(--accent-orange)' }}>{loadingStage}</span>
-                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{Math.round(loadingProgress)}%</span>
+                      <span className="aqua-inspect-accent font-medium">{loadingStage}</span>
+                      <span className="text-white font-semibold">{Math.round(loadingProgress)}%</span>
                     </div>
-                    <div className="rounded-xl overflow-hidden h-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                    <div className="aqua-progress-bg rounded-xl overflow-hidden h-3">
                       <div 
-                        className="h-full rounded-xl transition-all duration-500"
-                        style={{ 
-                          width: `${loadingProgress}%`,
-                          background: 'linear-gradient(90deg, var(--accent-orange) 0%, var(--accent-orange-light) 100%)',
-                          boxShadow: '0 0 20px rgba(255, 107, 53, 0.3)'
-                        }}
+                        className="aqua-progress-fill h-full rounded-xl transition-all duration-500"
+                        style={{ width: `${loadingProgress}%` }}
                         role="progressbar"
                         aria-valuenow={loadingProgress}
                         aria-valuemin={0}
@@ -631,7 +644,7 @@ export function DamageAssessment({
                         aria-label="Assessment progress"
                       ></div>
                     </div>
-                    <div className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
+                    <div className="text-xs text-center" style={{ color: '#666666' }}>
                       AI processing typically takes 20-30 seconds
                     </div>
                   </div>
@@ -644,210 +657,120 @@ export function DamageAssessment({
             )}
           </div>
 
-          {/* Knowledge Base Search - Will be moved to post-assessment chat */}
-          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', boxShadow: 'var(--shadow-default)' }}>
-            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-              📚 Search Knowledge Base
-            </h2>
-            <div className="flex gap-2 mb-4">
-              <label htmlFor="search-input" className="sr-only">
-                Search knowledge base
-              </label>
-              <input
-                id="search-input"
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search IICRC standards, procedures..."
-                className="flex-1 p-3 border rounded-lg dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    searchKnowledgeBase();
-                  }
-                }}
-                aria-describedby="search-help"
-                aria-label="Search industry standards and procedures"
-              />
-              <button
-                onClick={searchKnowledgeBase}
-                className="px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                aria-label="Search knowledge base"
-                disabled={!searchQuery.trim() || progressiveLoader.current.isLoading('search')}
-              >
-                {progressiveLoader.current.isLoading('search') ? '⏳' : '🔍'}
-              </button>
-            </div>
-            <div id="search-help" className="sr-only">
-              Search for IICRC standards, water damage procedures, and industry best practices. Press Enter or click search button to search.
-            </div>
-            
-            {searchResults && (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {searchResults.success ? (
-                  <>
-                    <p className="text-sm text-gray-600 dark:text-gray-400" aria-live="polite">
-                      Found {searchResults.total_results} results for "{searchResults.query}"
-                    </p>
-                    <div role="list" aria-label="Search results">
-                      {searchResults.results.map((result, idx) => (
-                        <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm" role="listitem">
-                          <div className="font-medium">{result.metadata?.title || `Document ${idx + 1}`}</div>
-                          <div className="text-gray-600 dark:text-gray-400 mt-1">
-                            {result.text?.substring(0, 100)}...
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div 
-                    className="p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800"
-                    role="alert"
-                    aria-live="polite"
-                  >
-                    <p className="text-red-700 dark:text-red-400 text-sm font-medium">
-                      ❌ Search Error: {searchResults.error}
-                    </p>
-                  </div>
-                )}
+          {/* Step 2: Assessment Results - Only visible after assessment */}
+          {assessment && (
+            <div className="aqua-card rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">2</div>
+                <h2 className="text-2xl font-semibold text-white">Assessment Results</h2>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Assessment Results */}
-        <AIErrorBoundary onRetry={handleRetry}>
-        {assessment && (
-          <div 
-            className="w-full rounded-3xl border border-gray-200 p-6 dark:border-gray-700"
-            role="region"
-            aria-labelledby="results-heading"
-          >
-            {assessment.success ? (
-              <div className="space-y-6">
-                <h2 id="results-heading" className="text-2xl font-semibold flex items-center gap-2">
-                  📋 Assessment Results
-                </h2>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2 mb-2">
-                        🤖 AI Vision Analysis
-                      </h3>
-                      <p className="text-gray-700 dark:text-gray-300 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        {assessment.vision_analysis}
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <h3 className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2 mb-2">
-                        📖 Industry Sources Applied
-                      </h3>
-                      <div className="space-y-2">
-                        {assessment.industry_sources.length > 0 ? (
-                          <div role="list" aria-label="Industry sources used">
-                            {assessment.industry_sources.map((source, idx) => (
-                              <div key={idx} className="p-2 bg-green-50 dark:bg-green-900/20 rounded text-sm" role="listitem">
-                                <div className="font-medium">
-                                  {source.metadata?.title || `Reference ${idx + 1}`}
-                                </div>
-                                <div className="text-gray-600 dark:text-gray-400">
-                                  Relevance: {Math.round((source.score || 0.8) * 100)}%
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-gray-500 italic">No specific industry sources matched</p>
-                        )}
-                      </div>
-                    </div>
+              {assessment.success ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="font-medium text-white flex items-center gap-2 mb-3">
+                      🤖 AI Vision Analysis
+                    </h3>
+                    <p className="text-gray-300 p-4 bg-gray-800 rounded-lg">
+                      {assessment.vision_analysis}
+                    </p>
                   </div>
                   
                   <div>
-                    <h3 className="font-medium text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                      🎯 Professional Assessment
+                    <h3 className="font-medium text-white flex items-center gap-2 mb-3">
+                      📖 Enhanced Assessment
                     </h3>
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                      <p className="text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
-                        {assessment.enhanced_assessment}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium">Confidence Score:</span>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-32 bg-gray-200 rounded-full h-2 dark:bg-gray-700"
-                          role="progressbar"
-                          aria-valuenow={Math.round(assessment.confidence_score * 100)}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-label={`Assessment confidence: ${Math.round(assessment.confidence_score * 100)} percent`}
-                        >
-                          <div 
-                            className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${assessment.confidence_score * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-bold" aria-hidden="true">
-                          {Math.round(assessment.confidence_score * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      <time dateTime={assessment.timestamp}>
-                        {new Date(assessment.timestamp).toLocaleString()}
-                      </time>
+                    <div className="text-gray-300 p-4 bg-gray-800 rounded-lg">
+                      {assessment.enhanced_assessment}
                     </div>
                   </div>
                   
-                  {(performanceStats || assessment.performance) && (
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-blue-700 dark:text-blue-400">Performance:</span>
-                        <div className="flex gap-4 text-xs text-blue-600 dark:text-blue-300">
-                          {assessment.performance?.total_time && (
-                            <span>⏱️ {(assessment.performance.total_time / 1000).toFixed(1)}s</span>
-                          )}
-                          {assessment.cached && (
-                            <span>💾 Cached</span>
-                          )}
-                          {assessment.performance?.cached === false && (
-                            <span>🔄 Fresh</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex justify-between items-center text-sm text-gray-400">
+                    <span>Confidence: {Math.round(assessment.confidence_score * 100)}%</span>
+                    {assessment.performance && (
+                      <span>Processing time: {(assessment.performance.total_time / 1000).toFixed(1)}s</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
+                  <p className="text-red-400 font-medium">❌ Assessment Error: {assessment.error}</p>
+                  {assessment.details && (
+                    <p className="text-red-300 text-sm mt-2">{assessment.details}</p>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Chat Interface - Only visible after assessment */}
+          {assessment && assessment.success && (
+            <div className="aqua-card rounded-2xl p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center text-sm font-semibold">3</div>
+                <h2 className="text-2xl font-semibold text-white">Ask Questions</h2>
               </div>
-            ) : (
-              <div className="text-center py-8" role="alert" aria-live="polite">
-                <div className="text-red-600 text-lg font-medium mb-2">
-                  ❌ Assessment Failed
-                </div>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  {assessment.error}: {assessment.details}
+              
+              <div className="space-y-4">
+                <p className="text-gray-300">
+                  Have questions about your assessment? Ask me anything about water damage restoration, IICRC standards, or next steps.
                 </p>
-                <button
-                  onClick={handleRetry}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                  aria-label="Retry damage assessment"
-                >
-                  Try Again
-                </button>
+                
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Ask about remediation steps, equipment needed, timeline..."
+                    className="flex-1 p-3 rounded-lg border transition-all duration-300"
+                    style={{ 
+                      backgroundColor: '#1a1a1a', 
+                      borderColor: '#333333', 
+                      color: '#ffffff' 
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        searchKnowledgeBase();
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={searchKnowledgeBase}
+                    className="aqua-button px-6 py-3 rounded-lg transition-all duration-300"
+                    disabled={!searchQuery.trim() || progressiveLoader.current.isLoading('search')}
+                  >
+                    {progressiveLoader.current.isLoading('search') ? '⏳' : '💬'}
+                  </button>
+                </div>
+                
+                {searchResults && (
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {searchResults.success ? (
+                      <div className="space-y-3">
+                        <p className="text-gray-400 text-sm">
+                          Found {searchResults.total_results} relevant resources:
+                        </p>
+                        {searchResults.results.map((result, idx) => (
+                          <div key={idx} className="p-4 bg-gray-800 rounded-lg">
+                            <div className="font-medium text-white">{result.metadata?.title || `Resource ${idx + 1}`}</div>
+                            <div className="text-gray-300 mt-2 text-sm">
+                              {result.text?.substring(0, 200)}...
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
+                        <p className="text-red-400 font-medium">❌ Search Error: {searchResults.error}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
-        </AIErrorBoundary>
+            </div>
+          )}
+        </div>
+
         </div>
       </main>
     </>

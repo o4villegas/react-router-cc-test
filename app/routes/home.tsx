@@ -32,7 +32,7 @@ export function loader({ context }: Route.LoaderArgs) {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
-    <div className="min-h-screen p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+    <div className="min-h-screen p-4">
       <Chatbot 
         apiEndpoint={loaderData.apiEndpoint}
         config={loaderData.config}
