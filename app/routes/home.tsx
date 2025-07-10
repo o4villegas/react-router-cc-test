@@ -6,10 +6,10 @@ export function meta({}: Route.MetaArgs) {
   const config = loadClientConfig();
   
   return [
-    { title: `${config.ui.app_name} - Water Damage Assessment` },
-    { name: "description", content: "AI-powered water damage assessment with industry expertise and IICRC standards" },
+    { title: `${config.ui.app_name} - AI Water Damage Assessment` },
+    { name: "description", content: "Professional AI-powered water damage assessment with computer vision and industry expertise" },
     { name: "viewport", content: "width=device-width, initial-scale=1" },
-    { name: "theme-color", content: "#2563eb" },
+    { name: "theme-color", content: "#ff6b35" },
   ];
 }
 
@@ -32,7 +32,7 @@ export function loader({ context }: Route.LoaderArgs) {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
+    <div className="min-h-screen bg-primary p-4">
       <Chatbot 
         apiEndpoint={loaderData.apiEndpoint}
         config={loaderData.config}

@@ -60,6 +60,8 @@ export function DamageAssessment({
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [validationError, setValidationError] = useState<ValidationError | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStage, setLoadingStage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -295,12 +297,16 @@ export function DamageAssessment({
     progressiveLoader.current.setLoading('assessment', true);
     setLoading(true);
     setAssessment(null);
+    setLoadingProgress(0);
+    setLoadingStage("Preparing image...");
     
     try {
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const base64 = e.target?.result as string;
+          setLoadingProgress(15);
+          setLoadingStage("Uploading image...");
           
           // Use request batching to prevent duplicate requests
           const requestKey = `assess_${selectedImage.name}_${selectedImage.size}`;
@@ -310,12 +316,36 @@ export function DamageAssessment({
             const controller = new AbortController();
             const timeoutId = memoryOptimizer.current.setTimeout(() => controller.abort(), config.api.timeout.damage_assessment);
             
+            // Start progress simulation for long-running process
+            setLoadingProgress(25);
+            setLoadingStage("Analyzing image with AI...");
+            
+            // Simulate progress during AI processing
+            const progressInterval = setInterval(() => {
+              setLoadingProgress(prev => {
+                if (prev < 85) {
+                  const increment = Math.random() * 5 + 2; // Random 2-7% increments
+                  return Math.min(prev + increment, 85);
+                }
+                return prev;
+              });
+            }, 2000); // Update every 2 seconds
+            
+            // Update stages during processing
+            setTimeout(() => setLoadingStage("Processing vision analysis..."), 5000);
+            setTimeout(() => setLoadingStage("Searching knowledge base..."), 12000);
+            setTimeout(() => setLoadingStage("Generating assessment..."), 18000);
+            
             const response = await fetch(apiEndpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ image: base64 }),
               signal: controller.signal
             });
+            
+            clearInterval(progressInterval);
+            setLoadingProgress(95);
+            setLoadingStage("Finalizing results...");
             
             
             if (!response.ok) {
@@ -334,6 +364,8 @@ export function DamageAssessment({
             setPerformanceStats(result.performance);
           }
           
+          setLoadingProgress(100);
+          setLoadingStage("Complete!");
           setAssessment(result);
           setRetryCount(0); // Reset retry count on success
           endTimer();
@@ -411,6 +443,11 @@ export function DamageAssessment({
     } finally {
       progressiveLoader.current.setLoading('assessment', false);
       setLoading(false);
+      // Reset progress after a brief delay to show completion
+      setTimeout(() => {
+        setLoadingProgress(0);
+        setLoadingStage("");
+      }, 1000);
     }
   }, [selectedImage, apiEndpoint, config.api.timeout.damage_assessment]);
 
@@ -493,19 +530,21 @@ export function DamageAssessment({
       </a>
       <main id="main-content" className="flex items-center justify-center pt-16 pb-4">
         <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
-        <header className="flex flex-col items-center gap-4">
-          <h1 className="text-4xl font-bold text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Smart Damage Assessment
+        <header className="flex flex-col items-center gap-6">
+          <h1 className="text-6xl font-bold text-center text-glow">
+            <span className="text-primary">Aqua</span>
+            <span className="text-accent"> Inspect</span>
+            <span className="text-primary"> Vision</span>
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 text-center max-w-2xl">
-            AI-powered water damage analysis enhanced with proprietary industry knowledge and IICRC standards
+          <p className="text-secondary text-center max-w-2xl text-lg">
+            Professional AI-powered water damage assessment with computer vision and industry expertise
           </p>
         </header>
 
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-6 px-4">
           {/* Image Upload Section */}
-          <div className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <div className="card">
+            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2 text-primary">
               📷 Upload Damage Photo
             </h2>
             <input 
@@ -513,7 +552,7 @@ export function DamageAssessment({
               type="file" 
               accept={config.image.allowed_types.join(',')} 
               onChange={handleImageUpload}
-              className="w-full p-3 border rounded-lg dark:bg-gray-800 mb-4"
+              className="input-dark w-full mb-4"
               aria-describedby="upload-help upload-error"
               aria-label="Upload damage photo for AI analysis"
             />
@@ -552,12 +591,37 @@ export function DamageAssessment({
                 <button 
                   onClick={assessDamage} 
                   disabled={loading || validationError !== null}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="btn-primary w-full"
                   aria-describedby="assess-help"
                   aria-label={loading ? "Analyzing image with AI" : "Start damage assessment"}
                 >
                   {loading ? "🔍 Analyzing with AI..." : "🚀 Assess Damage"}
                 </button>
+                
+                {/* Progress Bar */}
+                {loading && (
+                  <div className="w-full space-y-3">
+                    <div className="flex justify-between items-center text-sm text-secondary">
+                      <span className="text-accent font-medium">{loadingStage}</span>
+                      <span className="text-primary font-semibold">{Math.round(loadingProgress)}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill"
+                        style={{ width: `${loadingProgress}%` }}
+                        role="progressbar"
+                        aria-valuenow={loadingProgress}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Assessment progress"
+                      ></div>
+                    </div>
+                    <div className="text-xs text-muted text-center">
+                      AI processing typically takes 20-30 seconds
+                    </div>
+                  </div>
+                )}
+                
                 <div id="assess-help" className="sr-only">
                   {loading ? "Assessment in progress. Please wait." : "Click to analyze the uploaded image for water damage using AI."}
                 </div>
@@ -565,9 +629,9 @@ export function DamageAssessment({
             )}
           </div>
 
-          {/* Knowledge Base Search */}
-          <div className="rounded-3xl border border-gray-200 p-6 dark:border-gray-700">
-            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2">
+          {/* Knowledge Base Search - Will be moved to post-assessment chat */}
+          <div className="card">
+            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2 text-primary">
               📚 Search Knowledge Base
             </h2>
             <div className="flex gap-2 mb-4">

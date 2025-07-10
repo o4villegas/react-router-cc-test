@@ -64,7 +64,7 @@ const DEFAULT_CLIENT_CONFIG: ClientConfig = {
   },
 
   ui: {
-    app_name: 'Smart Damage Assessment',
+    app_name: 'Aqua Inspect Vision',
     version: '1.0.0',
     enable_debug: false,
   },
