@@ -45,8 +45,8 @@ This application helps water damage restoration professionals and insurance adju
 
 ### Prerequisites
 - Node.js 18+
-- Cloudflare account with Workers AI access
-- AutoRAG dataset configured (see AGENTS.md)
+- Cloudflare account with Workers AI access (for production)
+- AutoRAG dataset configured (see AGENTS.md for production setup)
 
 ### Installation
 ```bash
@@ -56,9 +56,34 @@ npm run typecheck
 ```
 
 ### Development
+
+#### Local Development (with AI Mocks)
+For local development, the application automatically uses realistic AI mocks to simulate Cloudflare Workers AI responses:
+
 ```bash
 npm run dev
 ```
+
+The application will:
+- ✅ Use mock AI responses for vision analysis, AutoRAG, and language generation
+- ✅ Provide realistic water damage assessment scenarios
+- ✅ Allow full UI testing without Cloudflare AI dependencies
+- ✅ Include proper error handling and timeout simulation
+
+#### Production Development (with Real AI)
+To test with actual Cloudflare AI services, deploy to Cloudflare Workers:
+
+```bash
+npm run deploy
+```
+
+#### Environment Variables
+You can control the behavior with environment variables:
+
+- `ENABLE_DEV_MOCKS=true` - Force use of AI mocks (default in development)
+- `AI_TIMEOUT_MS=5000` - Set AI operation timeout (default: 5s dev, 30s prod)
+- `ENABLE_AUTORAG=false` - Disable AutoRAG functionality
+- `NODE_ENV=development` - Set environment mode
 
 ### Deployment
 ```bash
@@ -67,9 +92,35 @@ npm run deploy
 
 ## Configuration
 
-Update `wrangler.jsonc` with your Cloudflare resources:
-- Replace `REPLACE_WITH_YOUR_DATASET_ID` with your AutoRAG dataset ID
-- Replace `REPLACE_WITH_YOUR_BUCKET_NAME` with your R2 bucket name
+### Development Configuration
+No configuration needed for local development - AI mocks are enabled automatically.
+
+### Production Configuration
+For production deployment, update `wrangler.jsonc`:
+
+1. **AutoRAG Dataset**: Create and configure your AutoRAG dataset with industry documents:
+   ```bash
+   # Create AutoRAG dataset (replace with your dataset name)
+   wrangler vectorize create auto-inspect-rag
+   ```
+
+2. **R2 Bucket**: The bucket `damagescan` is already configured in `wrangler.jsonc`
+
+3. **AI Models**: The following models are pre-configured:
+   - Vision: `@cf/llava-hf/llava-1.5-7b-hf`
+   - Language: `@cf/meta/llama-3.2-3b-instruct`
+   - AutoRAG: Uses your configured dataset
+
+### Troubleshooting
+
+**Issue: AI requests hanging in development**
+- ✅ **Solution**: This is expected! Use `ENABLE_DEV_MOCKS=true` (default) for local development
+
+**Issue: "AutoRAG dataset not found" in production**
+- ✅ **Solution**: Create and populate your AutoRAG dataset with IICRC documents (see AGENTS.md)
+
+**Issue: AI models not available**
+- ✅ **Solution**: Ensure your Cloudflare account has Workers AI access and the models are available in your region
 
 ## API Endpoints
 

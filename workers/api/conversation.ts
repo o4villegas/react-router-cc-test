@@ -1,4 +1,6 @@
 import type { Context } from 'hono';
+import { AIMocks } from '../ai-mocks';
+import { loadConfig } from '../config';
 
 interface ConversationRequest {
   question: string;
@@ -75,9 +77,22 @@ export async function handleConversationRequest(c: Context): Promise<Response> {
     const ragQuery = await buildContextualQuery(question, context);
     
     // Search knowledge base
-    const ragResponse = await (c.env as any).AI.autorag("auto-inspect-rag").aiSearch({
-      query: ragQuery,
-    });
+    const appConfig = loadConfig(c.env);
+    let ragResponse;
+    
+    if (AIMocks.shouldUseMocks(appConfig, c.env)) {
+      ragResponse = await AIMocks.mockAutoRAGSearch(ragQuery);
+    } else {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('AutoRAG timeout')), appConfig.ai.timeout_ms)
+      );
+      
+      const ragPromise = (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
+        query: ragQuery,
+      });
+      
+      ragResponse = await Promise.race([ragPromise, timeoutPromise]);
+    }
 
     if (!ragResponse?.response) {
       throw new Error('RAG query failed - no response received');
@@ -177,13 +192,29 @@ Please provide a helpful response that:
 3. Considers the damage shown in their image
 4. Ends with an engaging follow-up question`;
 
-  const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
-    messages: [
+  const appConfig = loadConfig(env);
+  let response;
+  
+  if (AIMocks.shouldUseMocks(appConfig, env)) {
+    response = await AIMocks.mockLanguageGeneration([
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage }
-    ],
-    max_tokens: 500
-  });
+    ]);
+  } else {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Language model timeout')), appConfig.ai.timeout_ms)
+    );
+    
+    const aiPromise = env.AI.run(appConfig.ai.language_model, {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage }
+      ],
+      max_tokens: 500
+    });
+    
+    response = await Promise.race([aiPromise, timeoutPromise]);
+  }
 
   return { content: response.response || "I'd be happy to help with that. Could you provide more details?" };
 }

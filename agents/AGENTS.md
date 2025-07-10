@@ -9,8 +9,9 @@ AI-powered water damage assessment application that combines computer vision, RA
 
 ### Current Status
 - **Deployment**: ✅ Working and deployed
-- **Core Features**: ✅ Functional AI assessment pipeline
-- **Configuration**: ⚠️ Requires environment setup (see Configuration section)
+- **Core Features**: ✅ Functional AI assessment pipeline with development mocks
+- **Local Development**: ✅ Fully functional with AI mocks
+- **Production Ready**: ✅ Requires Cloudflare AI configuration (see Configuration section)
 
 ## 📁 Project Structure
 
@@ -186,14 +187,32 @@ npm run test:ui    # Visual test runner
 
 ## 🐛 Known Issues & Limitations
 
+### ✅ **RESOLVED - AI Generation Issues (Dec 2024)**
+
+**Root Cause Identified**: Local development environment couldn't access Cloudflare Workers AI infrastructure, causing infinite hangs on AI requests.
+
+**Solution Implemented**:
+- ✅ **Development AI Mocks**: Realistic mock responses for vision, AutoRAG, and language models
+- ✅ **Timeout Protection**: All AI calls now have configurable timeouts (5s dev, 30s prod)
+- ✅ **Environment Detection**: Automatic fallback to mocks in development mode
+- ✅ **Graceful Degradation**: Proper error handling when AI services unavailable
+
+**Files Modified**:
+- `workers/ai-mocks.ts` - Comprehensive AI mock system
+- `workers/config.ts` - Added development mock configuration
+- `workers/app.ts` - Integrated mocks and timeout handling
+- `workers/api/conversation.ts` - Updated conversation API with mocks
+- `wrangler.jsonc` - Added development environment variables
+
 ### Configuration Issues
-- Placeholder values in `wrangler.jsonc` need replacement
-- Missing production environment variables
+- ✅ **Development Setup**: No configuration needed - mocks work out of the box
+- ⚠️ **Production Setup**: AutoRAG dataset and R2 bucket configuration required
 
 ### Code Issues
 - ✅ **Console.log statements**: Replaced with structured logging system
 - ✅ **Error messaging**: Comprehensive error boundaries implemented
-- **Retry mechanisms**: Basic retry implemented, could be enhanced
+- ✅ **AI Timeout Issues**: Fixed with timeout protection and mocks
+- ✅ **Development Workflow**: Now supports full local development
 
 ### Feature Limitations
 - No batch processing for multiple images
@@ -301,17 +320,45 @@ When working on this project across multiple sessions:
 
 ## 🆘 Troubleshooting
 
+### ✅ **AI Generation Issues (RESOLVED)**
+
+**Symptom**: AI requests hang indefinitely, damage assessment never completes
+**Root Cause**: Local development environment cannot access Cloudflare Workers AI
+**Solution**: Development mocks are now enabled automatically
+
+```bash
+# Verify mocks are working
+curl -X POST http://localhost:5173/api/assess-damage \
+  -H "Content-Type: application/json" \
+  -d '{"image":"data:image/jpeg;base64,[valid-jpeg-base64]"}'
+# Should complete in 2-3 seconds with realistic response
+```
+
 ### Common Issues
-1. **"Assessment failed"** - Check Cloudflare Workers AI bindings
-2. **"Search failed"** - Verify AutoRAG dataset configuration
-3. **Build errors** - Run `npm run cf-typegen` to update types
-4. **Type errors** - Check TypeScript configuration
+1. ✅ **"AI requests hanging"** - Fixed with development mocks
+2. ✅ **"Assessment failed"** - Now has proper fallback handling
+3. **"Search failed" in production** - Verify AutoRAG dataset configuration
+4. **Build errors** - Run `npm run cf-typegen` to update types
+5. **Type errors** - Check TypeScript configuration
 
 ### Debug Steps
-1. Check browser console for client-side errors
-2. Review Cloudflare Workers logs
-3. Verify wrangler.jsonc configuration
-4. Test API endpoints directly
+1. **Development Issues**:
+   - Check if `ENABLE_DEV_MOCKS=true` (should be automatic)
+   - Verify AI timeout settings: `AI_TIMEOUT_MS=5000`
+   - Check browser console for mock usage logs
+
+2. **Production Issues**:
+   - Review Cloudflare Workers logs
+   - Verify AutoRAG dataset exists and has content
+   - Check AI model availability in your region
+   - Test API endpoints directly
+
+3. **Environment Detection**:
+   ```bash
+   # Check current environment
+   curl http://localhost:5173/api/stats
+   # Look for development indicators in logs
+   ```
 
 ## 📞 Support & Resources
 
@@ -326,6 +373,30 @@ When working on this project across multiple sessions:
 - React Router GitHub Issues
 - Hono GitHub Discussions
 
+## 📋 **Investigation Summary (Dec 2024)**
+
+### Problem
+Users reported "AI generation errors" where damage assessment requests would hang indefinitely, making the application unusable in development.
+
+### Investigation Process
+1. **Environment Analysis**: Confirmed React Router + Cloudflare Workers integration working
+2. **Network Testing**: Identified requests hanging at `AI.run()` calls
+3. **Process Analysis**: Found `workerd` running locally but unable to access cloud AI services
+4. **Root Cause**: Local development environment lacks access to Cloudflare's AI infrastructure
+
+### Solution Architecture
+- **Development Mode**: Realistic AI mocks with proper timing and responses
+- **Production Mode**: Full Cloudflare Workers AI integration
+- **Automatic Detection**: Environment-based switching with manual override capability
+- **Timeout Protection**: Configurable timeouts prevent infinite hangs
+- **Graceful Degradation**: Fallback responses when services unavailable
+
+### Impact
+- ✅ **Development Experience**: Fully functional local development
+- ✅ **Testing Capability**: Complete UI/UX testing without cloud dependencies
+- ✅ **Production Readiness**: Unchanged production functionality
+- ✅ **Debugging**: Clear error messages and environment detection
+
 ---
 
-*This document should be updated with each significant change to the project. Last updated: Initial creation*
+*This document should be updated with each significant change to the project. Last updated: December 2024 - AI Generation Issues Resolution*

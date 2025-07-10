@@ -7,7 +7,10 @@
   "compatibility_date": "2025-04-01",
   "main": "./workers/app.ts",
   "vars": {
-    "VALUE_FROM_CLOUDFLARE": "Production Environment - DamageScan"
+    "VALUE_FROM_CLOUDFLARE": "Production Environment - DamageScan",
+    "ENABLE_DEV_MOCKS": "false",
+    "AI_TIMEOUT_MS": "30000",
+    "NODE_ENV": "production"
   },
   "observability": {
     "enabled": true
@@ -54,5 +57,15 @@
       "bucket_name": "damagescan"
     }
   ],
-  "upload_source_maps": true
+  "upload_source_maps": true,
+  "env": {
+    "development": {
+      "vars": {
+        "VALUE_FROM_CLOUDFLARE": "Development Environment - DamageScan",
+        "ENABLE_DEV_MOCKS": "true",
+        "AI_TIMEOUT_MS": "5000",
+        "NODE_ENV": "development"
+      }
+    }
+  }
 }

@@ -60,6 +60,8 @@ export interface AppConfig {
     autorag_dataset: string;
     enable_autorag: boolean;
     confidence_threshold: number;
+    enable_dev_mocks: boolean;
+    timeout_ms: number;
   };
 
   // Logging Configuration
@@ -132,6 +134,8 @@ const DEFAULT_CONFIG: AppConfig = {
     autorag_dataset: 'auto-inspect-rag',
     enable_autorag: true,
     confidence_threshold: 0.7,
+    enable_dev_mocks: false,
+    timeout_ms: 30000, // 30 seconds
   },
 
   logging: {
@@ -154,6 +158,10 @@ const ENVIRONMENT_OVERRIDES: Record<string, any> = {
   development: {
     app: {
       debugMode: true,
+    },
+    ai: {
+      enable_dev_mocks: true,
+      timeout_ms: 5000, // Shorter timeout for dev
     },
     logging: {
       level: 'debug',
@@ -282,6 +290,12 @@ export function loadConfig(env?: any): AppConfig {
     }
     if (env.ENABLE_AUTORAG !== undefined) {
       config.ai.enable_autorag = env.ENABLE_AUTORAG === 'true';
+    }
+    if (env.ENABLE_DEV_MOCKS !== undefined) {
+      config.ai.enable_dev_mocks = env.ENABLE_DEV_MOCKS === 'true';
+    }
+    if (env.AI_TIMEOUT_MS) {
+      config.ai.timeout_ms = parseInt(env.AI_TIMEOUT_MS);
     }
     if (env.LOG_LEVEL) {
       config.logging.level = env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error';

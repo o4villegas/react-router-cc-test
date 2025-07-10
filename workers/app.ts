@@ -5,6 +5,7 @@ import { createCacheService, createPerformanceMonitor, createImageOptimizer } fr
 import { apiRateLimit, aiRateLimit } from "./middleware/rate-limit";
 import { productionCors, developmentCors } from "./middleware/cors";
 import { handleConversationRequest } from "./api/conversation";
+import { AIMocks } from "./ai-mocks";
 
 // Load configuration with environment detection
 let appConfig;
@@ -353,10 +354,30 @@ app.post("/api/assess-damage", async (c) => {
     // Check vision cache first
     let visionResponse = await cacheService.getCachedVisionResult(imageHash);
     if (!visionResponse) {
-      visionResponse = await (c.env as any).AI.run(appConfig.ai.vision_model, {
-        image: Array.from(sanitizedBuffer),
-        prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
-      });
+      // Check if we should use development mocks
+      if (AIMocks.shouldUseMocks(appConfig, c.env)) {
+        logger.info('Using AI mocks for development');
+        const mockResponse = await AIMocks.mockVisionAnalysis(
+          sanitizedBuffer,
+          "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
+        );
+        visionResponse = {
+          description: mockResponse.description,
+          confidence: mockResponse.confidence
+        };
+      } else {
+        // Production AI call with timeout
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI vision analysis timeout')), appConfig.ai.timeout_ms)
+        );
+        
+        const aiPromise = (c.env as any).AI.run(appConfig.ai.vision_model, {
+          image: Array.from(sanitizedBuffer),
+          prompt: "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
+        });
+        
+        visionResponse = await Promise.race([aiPromise, timeoutPromise]);
+      }
       
       // Cache vision result
       await cacheService.cacheVisionResult(imageHash, visionResponse);
@@ -370,7 +391,7 @@ app.post("/api/assess-damage", async (c) => {
     
     try {
       // Check if AI binding and autorag method exist
-      if ((c.env as any).AI && typeof (c.env as any).AI.autorag === 'function' && appConfig.ai.enable_autorag) {
+      if (appConfig.ai.enable_autorag) {
         const ragQuery = `water damage ${visionResponse.description} remediation guidelines IICRC standards`;
         
         // Check RAG cache first
@@ -378,15 +399,30 @@ app.post("/api/assess-damage", async (c) => {
         if (cachedRAGResult) {
           ragResponse = cachedRAGResult;
         } else {
-          ragResponse = await (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
-            query: ragQuery
-          });
+          // Use mocks or real AutoRAG
+          if (AIMocks.shouldUseMocks(appConfig, c.env)) {
+            logger.info('Using AutoRAG mocks for development');
+            ragResponse = await AIMocks.mockAutoRAGSearch(ragQuery);
+          } else if ((c.env as any).AI && typeof (c.env as any).AI.autorag === 'function') {
+            // Production AutoRAG call with timeout
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('AutoRAG timeout')), appConfig.ai.timeout_ms)
+            );
+            
+            const ragPromise = (c.env as any).AI.autorag(appConfig.ai.autorag_dataset).aiSearch({
+              query: ragQuery
+            });
+            
+            ragResponse = await Promise.race([ragPromise, timeoutPromise]);
+          } else {
+            logger.warn('AutoRAG not available, continuing with vision-only analysis');
+          }
           
           // Cache RAG result
           await cacheService.cacheRAGResult(ragQuery, ragResponse);
         }
       } else {
-        logger.warn('AutoRAG not available or disabled, continuing with vision-only analysis');
+        logger.info('AutoRAG disabled, continuing with vision-only analysis');
       }
     } catch (error) {
       logger.error('AutoRAG search failed', { error: (error as Error).message, stack: (error as Error).stack });
@@ -398,8 +434,10 @@ app.post("/api/assess-damage", async (c) => {
     // Step 3: Combine Vision + RAG for Enhanced Assessment
     const assessmentTimer = performanceMonitor.startTimer('enhanced_assessment');
     
-    const enhancedAssessment = await (c.env as any).AI.run(appConfig.ai.language_model, {
-      messages: [
+    let enhancedAssessment;
+    if (AIMocks.shouldUseMocks(appConfig, c.env)) {
+      logger.info('Using language model mocks for development');
+      const mockResponse = await AIMocks.mockLanguageGeneration([
         {
           role: "system", 
           content: "You are a friendly and experienced water damage restoration expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
@@ -408,8 +446,29 @@ app.post("/api/assess-damage", async (c) => {
           role: "user",
           content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, help me understand' : 'Based on standard water damage restoration practices, help me understand'} this water damage situation. Please provide a conversational assessment that covers: 1) What type of damage we're dealing with 2) The steps we'll need to take 3) How long this might take 4) What equipment will be needed 5) What to document for insurance. Keep the tone friendly and reassuring, and end with a specific question to learn more about the situation.`
         }
-      ]
-    });
+      ]);
+      enhancedAssessment = mockResponse;
+    } else {
+      // Production language model call with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Language model timeout')), appConfig.ai.timeout_ms)
+      );
+      
+      const aiPromise = (c.env as any).AI.run(appConfig.ai.language_model, {
+        messages: [
+          {
+            role: "system", 
+            content: "You are a friendly and experienced water damage restoration expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
+          },
+          {
+            role: "user",
+            content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, help me understand' : 'Based on standard water damage restoration practices, help me understand'} this water damage situation. Please provide a conversational assessment that covers: 1) What type of damage we're dealing with 2) The steps we'll need to take 3) How long this might take 4) What equipment will be needed 5) What to document for insurance. Keep the tone friendly and reassuring, and end with a specific question to learn more about the situation.`
+          }
+        ]
+      });
+      
+      enhancedAssessment = await Promise.race([aiPromise, timeoutPromise]);
+    }
     
     assessmentTimer();
 
