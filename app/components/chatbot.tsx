@@ -288,7 +288,7 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
             <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                 message.role === 'user' 
-                  ? 'aqua-button text-primary' 
+                  ? 'aqua-button aqua-text-primary' 
                   : 'aqua-bg-secondary aqua-text-primary border aqua-border-primary'
               }`}>
                 {message.imageUrl && (
@@ -312,7 +312,7 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
             <div className="flex justify-start">
               <div className="aqua-bg-secondary border aqua-border-primary rounded-lg px-4 py-2">
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-accent-orange border-t-transparent rounded-full"></div>
+                  <div className="animate-spin h-4 w-4 spinner"></div>
                   <span className="text-sm aqua-text-secondary">Analyzing...</span>
                 </div>
               </div>

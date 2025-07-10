@@ -85,7 +85,7 @@ body {
 
 .aqua-button {
   background: linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-dark) 100%);
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   border: none;
 }
 
@@ -142,7 +142,7 @@ body {
 /* Neon Orange Button Styles */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-dark) 100%);
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   border: none;
   border-radius: 12px;
   padding: 12px 24px;
@@ -258,13 +258,13 @@ body {
 }
 
 /* Utility Classes - Using aqua- prefix to avoid Tailwind conflicts */
-.aqua-bg-secondary { background-color: var(--bg-secondary, #1a1a1a); }
+.aqua-bg-secondary { background-color: var(--bg-secondary, #1a1a1a) !important; }
 
-.aqua-text-primary { color: var(--text-primary, #ffffff); }
-.aqua-text-secondary { color: var(--text-secondary, #a0a0a0); }
-.aqua-text-muted { color: var(--text-muted, #666666); }
+.aqua-text-primary { color: var(--text-primary, #ffffff) !important; }
+.aqua-text-secondary { color: var(--text-secondary, #a0a0a0) !important; }
+.aqua-text-muted { color: var(--text-muted, #666666) !important; }
 
-.aqua-border-primary { border-color: var(--border-primary, #333333); }
+.aqua-border-primary { border-color: var(--border-primary, #333333) !important; }
 
 /* Focus and ring utilities */
 .focus\:ring-accent-orange:focus { 
@@ -280,4 +280,39 @@ body {
 /* Animation for smooth transitions */
 .transition-smooth {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Force dark theme - Override any potential blue colors */
+.text-blue-700,
+.text-blue-500,
+.text-blue-600,
+.text-blue-400,
+.bg-blue-100,
+.bg-blue-200,
+.bg-blue-500,
+.bg-blue-600,
+.bg-blue-700 {
+  color: var(--text-primary) !important;
+  background-color: var(--bg-secondary) !important;
+}
+
+/* Ensure buttons use our styling */
+button {
+  color: var(--text-primary);
+}
+
+/* Ensure chat messages use dark theme */
+.chat-message {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Force dark theme on all text inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-primary) !important;
 }
