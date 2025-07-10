@@ -21,18 +21,18 @@ export interface MockLanguageResponse {
   response: string;
 }
 
-// Realistic mock vision analysis responses
+// Remediation-focused mock vision analysis responses
 const MOCK_VISION_RESPONSES: MockVisionResponse[] = [
   {
-    description: "Water damage visible on drywall with dark staining patterns indicating moisture infiltration. Affected materials include painted drywall surface with potential bubbling or peeling paint. Severity appears moderate with localized staining suggesting recent water exposure from possible pipe leak or roof infiltration.",
+    description: "**Materials Damaged:** Painted drywall with bubbling/peeling paint, potential insulation behind wall. **Damage Class:** Class 2 (part of room affected). **Water Category:** Category 1 (clean water source). **Removal vs Drying:** Drywall can likely be dried in place if moisture content <25%, paint requires removal and reapplication. **Room Concerns:** Check for hidden damage behind baseboards, ensure adequate ventilation for drying. **Safety Issues:** No immediate structural concerns, standard PPE recommended.",
     confidence: 0.85
   },
   {
-    description: "Ceiling water damage with brown discoloration and visible water stains. Materials affected include acoustic ceiling tiles and surrounding drywall. Moderate to severe damage indicated by extensive staining pattern and potential structural concerns requiring immediate assessment.",
+    description: "**Materials Damaged:** Acoustic ceiling tiles (removal required), drywall substrate, potential ceiling insulation. **Damage Class:** Class 3 (ceiling overhead, gravity-fed). **Water Category:** Category 2 (gray water - potential contamination). **Removal vs Drying:** All ceiling tiles must be removed, drywall assessment needed with moisture meter. **Room Concerns:** Structural integrity of ceiling joists requires inspection, containment recommended. **Safety Issues:** Potential overhead hazard, hard hat required during inspection.",
     confidence: 0.78
   },
   {
-    description: "Floor water damage with warped laminate or hardwood flooring. Visible buckling and separation at seams indicating significant moisture exposure. Affected area shows signs of prolonged water contact with potential subfloor damage requiring professional evaluation.",
+    description: "**Materials Damaged:** Laminate/hardwood flooring, subflooring, potential floor joists. **Damage Class:** Class 4 (specialty drying situations). **Water Category:** Category 1-2 (depends on source). **Removal vs Drying:** Flooring requires removal, subfloor assessment with moisture readings. **Room Concerns:** Check crawl space/basement below for additional damage, HVAC duct inspection if present. **Safety Issues:** Floor stability concerns, avoid heavy equipment until structural assessment.",
     confidence: 0.82
   }
 ];
