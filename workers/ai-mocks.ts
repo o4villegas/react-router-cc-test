@@ -124,8 +124,7 @@ export class AIMocks {
    * Check if development mocks should be used
    */
   static shouldUseMocks(config: any, env: any): boolean {
-    // Use mocks if explicitly enabled or if in development mode
-    return config.ai.enable_dev_mocks || 
-           (config.app.environment === 'development' && !env.AI);
+    // Use mocks only if explicitly enabled
+    return config.ai.enable_dev_mocks === true;
   }
 }

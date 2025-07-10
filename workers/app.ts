@@ -359,7 +359,7 @@ app.post("/api/assess-damage", async (c) => {
         logger.info('Using AI mocks for development');
         const mockResponse = await AIMocks.mockVisionAnalysis(
           sanitizedBuffer,
-          "Analyze this water damage image. Describe the type of damage, affected materials, severity level, and any visible issues like staining, warping, or mold."
+          "Analyze this image for property damage assessment. Describe any type of damage present, affected materials, severity level, and visible issues. Be objective and only describe what is actually visible."
         );
         visionResponse = {
           description: mockResponse.description,
@@ -373,7 +373,7 @@ app.post("/api/assess-damage", async (c) => {
         
         const aiPromise = (c.env as any).AI.run(appConfig.ai.vision_model, {
           image: Array.from(sanitizedBuffer),
-          prompt: "Analyze this water damage image focusing on remediation planning. Identify: 1) Specific materials damaged (drywall, flooring, insulation, etc.), 2) Water damage class (Class 1-4 based on affected area), 3) Water category (1-3 based on contamination level), 4) Which materials require removal vs. can be dried in place, 5) Room-specific concerns (ventilation, structural elements, hidden damage areas), 6) Immediate safety issues. Provide specific details needed for IICRC-compliant remediation planning."
+          prompt: "Analyze this image for property damage assessment. Identify: 1) What type of damage (if any) is visible, 2) Specific materials and surfaces affected, 3) Severity and extent of any damage, 4) If water damage is present, assess water damage class (Class 1-4) and category (1-3), 5) Structural or safety concerns, 6) Recommended next steps for assessment or remediation. Be objective and only describe what is actually visible in the image."
         });
         
         visionResponse = await Promise.race([aiPromise, timeoutPromise]);
@@ -392,7 +392,7 @@ app.post("/api/assess-damage", async (c) => {
     try {
       // Check if AI binding and autorag method exist
       if (appConfig.ai.enable_autorag) {
-        const ragQuery = `water damage classification materials assessment removal vs drying ${visionResponse.description} IICRC S500 standards remediation protocol equipment requirements`;
+        const ragQuery = `property damage assessment materials analysis ${visionResponse.description} remediation standards protocol requirements`;
         
         // Check RAG cache first
         let cachedRAGResult = await cacheService.getCachedRAGResult(ragQuery);
@@ -440,11 +440,11 @@ app.post("/api/assess-damage", async (c) => {
       const mockResponse = await AIMocks.mockLanguageGeneration([
         {
           role: "system", 
-          content: "You are a friendly and experienced water damage restoration expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
+          content: "You are a friendly and experienced property damage assessment expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
         },
         {
           role: "user",
-          content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, provide a professional remediation assessment' : 'Based on IICRC S500 standards, provide a professional remediation assessment'} for this water damage situation. Structure your response to cover: 1) **Damage Classification** (Class 1-4 and Category 1-3), 2) **Materials Assessment** (what can be dried vs. must be removed), 3) **Remediation Strategy** (equipment needed, drying protocol), 4) **Timeline and Phases** (emergency services, drying, reconstruction), 5) **Safety Considerations** (PPE requirements, containment needs), 6) **Documentation Requirements** (moisture readings, photo documentation). Keep the tone professional but approachable, and end with a specific question about the property's conditions or timeline.`
+          content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, provide a professional assessment' : 'Based on standard assessment practices, provide a professional assessment'} for this situation. Structure your response based on what was actually found in the image analysis. If damage is present, cover: 1) **Damage Classification** (type and severity), 2) **Materials Assessment** (what can be repaired vs. must be removed), 3) **Remediation Strategy** (equipment needed, repair protocol), 4) **Timeline and Phases** (emergency services, repairs, reconstruction), 5) **Safety Considerations** (PPE requirements, containment needs), 6) **Documentation Requirements** (photos, measurements, documentation). If no damage is visible, explain that clearly. Keep the tone professional but approachable, and end with a specific question about the property's conditions or timeline.`
         }
       ]);
       enhancedAssessment = mockResponse;
@@ -458,11 +458,11 @@ app.post("/api/assess-damage", async (c) => {
         messages: [
           {
             role: "system", 
-            content: "You are a friendly and experienced water damage restoration expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
+            content: "You are a friendly and experienced property damage assessment expert who communicates in a conversational, approachable tone. Your goal is to help property owners understand their situation and feel confident about the next steps. Always end your response with an engaging follow-up question to encourage further conversation and gather more details that could help with the assessment."
           },
           {
             role: "user",
-            content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, help me understand' : 'Based on standard water damage restoration practices, help me understand'} this water damage situation. Please provide a conversational assessment that covers: 1) What type of damage we're dealing with 2) The steps we'll need to take 3) How long this might take 4) What equipment will be needed 5) What to document for insurance. Keep the tone friendly and reassuring, and end with a specific question to learn more about the situation.`
+            content: `Vision Analysis: ${visionResponse.description}\n\nIndustry Guidelines: ${ragResponse.response || JSON.stringify(ragResponse.data || [])}\n\n${ragResponse.response || ragResponse.data?.length ? 'Using industry guidelines above, help me understand' : 'Based on standard property damage assessment practices, help me understand'} this situation. Please provide a conversational assessment based on what was actually found in the image analysis. If damage is present, cover: 1) What type of damage we're dealing with 2) The steps we'll need to take 3) How long this might take 4) What equipment will be needed 5) What to document for insurance. If no damage is visible, explain that clearly. Keep the tone friendly and reassuring, and end with a specific question to learn more about the situation.`
           }
         ]
       });
