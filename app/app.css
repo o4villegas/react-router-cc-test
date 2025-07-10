@@ -4,6 +4,11 @@
   --font-sans:
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    
+  /* Custom colors for Aqua Inspect Vision */
+  --color-orange-primary: #ff6b35;
+  --color-orange-light: #ff8f65;
+  --color-orange-dark: #e55529;
 }
 
 /* Aqua Inspect Vision - Dark Theme Color System */

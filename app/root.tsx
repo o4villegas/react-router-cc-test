@@ -29,10 +29,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Aqua Inspect Vision - AI Water Damage Assessment</title>
         <Meta />
         <Links />
       </head>
-      <body className="bg-primary text-primary">
+      <body style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
         {children}
         <ScrollRestoration />
         <Scripts />

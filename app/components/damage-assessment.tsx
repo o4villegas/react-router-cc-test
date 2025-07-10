@@ -531,20 +531,20 @@ export function DamageAssessment({
       <main id="main-content" className="flex items-center justify-center pt-16 pb-4">
         <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
         <header className="flex flex-col items-center gap-6">
-          <h1 className="text-6xl font-bold text-center text-glow">
-            <span className="text-primary">Aqua</span>
-            <span className="text-accent"> Inspect</span>
-            <span className="text-primary"> Vision</span>
+          <h1 className="text-6xl font-bold text-center" style={{ textShadow: '0 0 10px rgba(255, 107, 53, 0.3)' }}>
+            <span style={{ color: 'var(--text-primary)' }}>Aqua</span>
+            <span style={{ color: 'var(--accent-orange)' }}> Inspect</span>
+            <span style={{ color: 'var(--text-primary)' }}> Vision</span>
           </h1>
-          <p className="text-secondary text-center max-w-2xl text-lg">
+          <p className="text-center max-w-2xl text-lg" style={{ color: 'var(--text-secondary)' }}>
             Professional AI-powered water damage assessment with computer vision and industry expertise
           </p>
         </header>
 
         <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-6 px-4">
           {/* Image Upload Section */}
-          <div className="card">
-            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2 text-primary">
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', boxShadow: 'var(--shadow-default)' }}>
+            <h2 id="upload-section" className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               📷 Upload Damage Photo
             </h2>
             <input 
@@ -552,7 +552,12 @@ export function DamageAssessment({
               type="file" 
               accept={config.image.allowed_types.join(',')} 
               onChange={handleImageUpload}
-              className="input-dark w-full mb-4"
+              className="w-full mb-4 p-3 rounded-lg border transition-all duration-300"
+              style={{ 
+                backgroundColor: 'var(--bg-secondary)', 
+                borderColor: 'var(--border-primary)', 
+                color: 'var(--text-primary)' 
+              }}
               aria-describedby="upload-help upload-error"
               aria-label="Upload damage photo for AI analysis"
             />
@@ -591,7 +596,13 @@ export function DamageAssessment({
                 <button 
                   onClick={assessDamage} 
                   disabled={loading || validationError !== null}
-                  className="btn-primary w-full"
+                  className="w-full px-6 py-3 rounded-xl font-semibold transition-all duration-300 disabled:opacity-50"
+                  style={{ 
+                    background: loading || validationError ? 'var(--bg-secondary)' : 'linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-dark) 100%)',
+                    color: 'var(--text-primary)',
+                    border: 'none',
+                    boxShadow: loading || validationError ? 'none' : 'var(--shadow-default)'
+                  }}
                   aria-describedby="assess-help"
                   aria-label={loading ? "Analyzing image with AI" : "Start damage assessment"}
                 >
@@ -601,14 +612,18 @@ export function DamageAssessment({
                 {/* Progress Bar */}
                 {loading && (
                   <div className="w-full space-y-3">
-                    <div className="flex justify-between items-center text-sm text-secondary">
-                      <span className="text-accent font-medium">{loadingStage}</span>
-                      <span className="text-primary font-semibold">{Math.round(loadingProgress)}%</span>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="font-medium" style={{ color: 'var(--accent-orange)' }}>{loadingStage}</span>
+                      <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{Math.round(loadingProgress)}%</span>
                     </div>
-                    <div className="progress-bar">
+                    <div className="rounded-xl overflow-hidden h-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                       <div 
-                        className="progress-fill"
-                        style={{ width: `${loadingProgress}%` }}
+                        className="h-full rounded-xl transition-all duration-500"
+                        style={{ 
+                          width: `${loadingProgress}%`,
+                          background: 'linear-gradient(90deg, var(--accent-orange) 0%, var(--accent-orange-light) 100%)',
+                          boxShadow: '0 0 20px rgba(255, 107, 53, 0.3)'
+                        }}
                         role="progressbar"
                         aria-valuenow={loadingProgress}
                         aria-valuemin={0}
@@ -616,7 +631,7 @@ export function DamageAssessment({
                         aria-label="Assessment progress"
                       ></div>
                     </div>
-                    <div className="text-xs text-muted text-center">
+                    <div className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
                       AI processing typically takes 20-30 seconds
                     </div>
                   </div>
@@ -630,8 +645,8 @@ export function DamageAssessment({
           </div>
 
           {/* Knowledge Base Search - Will be moved to post-assessment chat */}
-          <div className="card">
-            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2 text-primary">
+          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', boxShadow: 'var(--shadow-default)' }}>
+            <h2 id="search-section" className="text-xl font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
               📚 Search Knowledge Base
             </h2>
             <div className="flex gap-2 mb-4">
