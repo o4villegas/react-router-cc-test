@@ -210,7 +210,7 @@ Please provide a helpful response that:
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage }
       ],
-      max_tokens: 500
+      max_tokens: 1500
     });
     
     response = await Promise.race([aiPromise, timeoutPromise]);
