@@ -1,16 +1,16 @@
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
-import { loadConfig, type AppConfig } from "./config";
-import { createCacheService, createPerformanceMonitor, createImageOptimizer, type CacheService, type PerformanceMonitor, type ImageOptimizer } from "./cache";
+import { loadConfig } from "./config";
+import { createCacheService, createPerformanceMonitor, createImageOptimizer } from "./cache";
 import { apiRateLimit, aiRateLimit } from "./middleware/rate-limit";
 import { productionCors, developmentCors } from "./middleware/cors";
 import { handleConversationRequest } from "./api/conversation";
 
 // Load configuration with environment detection
-let appConfig: AppConfig;
-let cacheService: CacheService;
-let performanceMonitor: PerformanceMonitor;
-let imageOptimizer: ImageOptimizer;
+let appConfig;
+let cacheService;
+let performanceMonitor;
+let imageOptimizer;
 
 try {
   appConfig = loadConfig();
@@ -24,7 +24,7 @@ try {
 
 // Enhanced logger with configuration-driven behavior
 const logger = {
-  error: (message: string, data?: any) => {
+  error: (message, data) => {
     if (appConfig.logging.level === 'error' || appConfig.logging.level === 'warn' || 
         appConfig.logging.level === 'info' || appConfig.logging.level === 'debug') {
       const logData = appConfig.logging.enable_structured_logging ? 
@@ -33,7 +33,7 @@ const logger = {
       console.error(logData, appConfig.logging.enable_structured_logging ? undefined : data);
     }
   },
-  info: (message: string, data?: any) => {
+  info: (message, data) => {
     if (appConfig.logging.level === 'info' || appConfig.logging.level === 'debug') {
       const logData = appConfig.logging.enable_structured_logging ? 
         { level: 'INFO', message, data, timestamp: new Date().toISOString() } : 
@@ -41,7 +41,7 @@ const logger = {
       console.log(logData, appConfig.logging.enable_structured_logging ? undefined : data);
     }
   },
-  warn: (message: string, data?: any) => {
+  warn: (message, data) => {
     if (appConfig.logging.level === 'warn' || appConfig.logging.level === 'info' || 
         appConfig.logging.level === 'debug') {
       const logData = appConfig.logging.enable_structured_logging ? 
@@ -50,7 +50,7 @@ const logger = {
       console.warn(logData, appConfig.logging.enable_structured_logging ? undefined : data);
     }
   },
-  debug: (message: string, data?: any) => {
+  debug: (message, data) => {
     if (appConfig.logging.level === 'debug') {
       const logData = appConfig.logging.enable_structured_logging ? 
         { level: 'DEBUG', message, data, timestamp: new Date().toISOString() } : 
