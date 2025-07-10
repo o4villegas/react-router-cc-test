@@ -160,8 +160,8 @@ const ENVIRONMENT_OVERRIDES: Record<string, any> = {
       debugMode: true,
     },
     ai: {
-      enable_dev_mocks: true,
-      timeout_ms: 5000, // Shorter timeout for dev
+      enable_dev_mocks: false,
+      timeout_ms: 30000, // Use production timeout
     },
     logging: {
       level: 'debug',

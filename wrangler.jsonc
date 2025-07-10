@@ -62,8 +62,8 @@
     "development": {
       "vars": {
         "VALUE_FROM_CLOUDFLARE": "Development Environment - DamageScan",
-        "ENABLE_DEV_MOCKS": "true",
-        "AI_TIMEOUT_MS": "5000",
+        "ENABLE_DEV_MOCKS": "false",
+        "AI_TIMEOUT_MS": "30000",
         "NODE_ENV": "development"
       }
     }
