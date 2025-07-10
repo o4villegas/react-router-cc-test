@@ -52,50 +52,50 @@
 
 html,
 body {
-  background-color: #0a0a0a !important;
-  color: #ffffff !important;
+  background-color: var(--bg-primary, #0a0a0a);
+  color: var(--text-primary, #ffffff);
   color-scheme: dark;
 }
 
 /* Override any light mode defaults */
 * {
-  border-color: #333333;
+  border-color: var(--border-primary, #333333);
 }
 
 /* Force dark background on all containers */
 .min-h-screen {
-  background-color: #0a0a0a !important;
+  background-color: var(--bg-primary, #0a0a0a);
 }
 
 /* Force dark theme styles for key components */
 .aqua-inspect-title {
-  color: #ffffff !important;
-  text-shadow: 0 0 10px rgba(255, 107, 53, 0.3) !important;
+  color: var(--text-primary);
+  text-shadow: var(--glow-orange);
 }
 
 .aqua-inspect-accent {
-  color: #ff6b35 !important;
+  color: var(--accent-orange);
 }
 
 .aqua-card {
-  background-color: #2a2a2a !important;
-  border: 1px solid #333333 !important;
-  color: #ffffff !important;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  color: var(--text-primary);
 }
 
 .aqua-button {
-  background: linear-gradient(135deg, #ff6b35 0%, #e55529 100%) !important;
-  color: #ffffff !important;
-  border: none !important;
+  background: linear-gradient(135deg, var(--accent-orange) 0%, var(--accent-orange-dark) 100%);
+  color: var(--text-primary);
+  border: none;
 }
 
 .aqua-progress-bg {
-  background-color: #1a1a1a !important;
+  background-color: var(--bg-secondary);
 }
 
 .aqua-progress-fill {
-  background: linear-gradient(90deg, #ff6b35 0%, #ff8f65 100%) !important;
-  box-shadow: 0 0 20px rgba(255, 107, 53, 0.3) !important;
+  background: linear-gradient(90deg, var(--accent-orange) 0%, var(--accent-orange-light) 100%);
+  box-shadow: var(--glow-orange);
 }
 
 /* Screen reader only utility class */
@@ -257,20 +257,25 @@ body {
   100% { transform: rotate(360deg); }
 }
 
-/* Utility Classes */
-.bg-primary { background-color: var(--bg-primary); }
-.bg-secondary { background-color: var(--bg-secondary); }
-.bg-card { background-color: var(--bg-card); }
-.bg-elevated { background-color: var(--bg-elevated); }
+/* Utility Classes - Using aqua- prefix to avoid Tailwind conflicts */
+.aqua-bg-secondary { background-color: var(--bg-secondary, #1a1a1a); }
 
-.text-primary { color: var(--text-primary); }
-.text-secondary { color: var(--text-secondary); }
-.text-muted { color: var(--text-muted); }
-.text-accent { color: var(--text-accent); }
+.aqua-text-primary { color: var(--text-primary, #ffffff); }
+.aqua-text-secondary { color: var(--text-secondary, #a0a0a0); }
+.aqua-text-muted { color: var(--text-muted, #666666); }
 
-.border-primary { border-color: var(--border-primary); }
-.border-secondary { border-color: var(--border-secondary); }
-.border-accent { border-color: var(--border-accent); }
+.aqua-border-primary { border-color: var(--border-primary, #333333); }
+
+/* Focus and ring utilities */
+.focus\:ring-accent-orange:focus { 
+  outline: 2px solid var(--accent-orange);
+  outline-offset: 2px;
+  box-shadow: var(--glow-orange);
+}
+.focus\:border-accent-orange:focus { border-color: var(--accent-orange); }
+
+/* Placeholder utilities */
+.placeholder\:aqua-text-muted::placeholder { color: var(--text-muted, #666666); }
 
 /* Animation for smooth transitions */
 .transition-smooth {

@@ -275,11 +275,11 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
 
   return (
     <AIErrorBoundary>
-      <div className="flex flex-col h-full max-w-4xl mx-auto bg-white dark:bg-gray-900 rounded-lg shadow-lg">
+      <div className="flex flex-col h-full max-w-4xl mx-auto aqua-card rounded-lg shadow-lg">
         {/* Chat Header */}
-        <div className="bg-blue-600 dark:bg-blue-800 text-white p-4 rounded-t-lg">
-          <h2 className="text-xl font-semibold">Damage Assessment Assistant</h2>
-          <p className="text-blue-100 text-sm">Upload an image to begin damage analysis</p>
+        <div className="aqua-card rounded-t-lg border-b aqua-border-primary">
+          <h2 className="text-xl font-semibold aqua-inspect-title">Damage Assessment Assistant</h2>
+          <p className="aqua-text-secondary text-sm">Upload an image to begin damage analysis</p>
         </div>
 
         {/* Messages Area */}
@@ -288,8 +288,8 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
             <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
                 message.role === 'user' 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                  ? 'aqua-button text-primary' 
+                  : 'aqua-bg-secondary aqua-text-primary border aqua-border-primary'
               }`}>
                 {message.imageUrl && (
                   <img 
@@ -310,10 +310,10 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
           
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-200 dark:bg-gray-700 rounded-lg px-4 py-2">
+              <div className="aqua-bg-secondary border aqua-border-primary rounded-lg px-4 py-2">
                 <div className="flex items-center space-x-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">Analyzing...</span>
+                  <div className="animate-spin h-4 w-4 border-2 border-accent-orange border-t-transparent rounded-full"></div>
+                  <span className="text-sm aqua-text-secondary">Analyzing...</span>
                 </div>
               </div>
             </div>
@@ -323,7 +323,7 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
         </div>
 
         {/* Input Area */}
-        <div className="border-t dark:border-gray-700 p-4">
+        <div className="border-t aqua-border-primary p-4">
           {!conversationState.hasImage ? (
             /* Image Upload */
             <div className="text-center">
@@ -340,11 +340,11 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading}
-                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg font-medium transition-colors"
+                className="aqua-button px-6 py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 📷 Upload Damage Photo
               </button>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              <p className="text-xs aqua-text-muted mt-2">
                 Supported: {config.image.allowed_types.join(', ')} • Max {config.image.max_file_size / (1024 * 1024)}MB
               </p>
             </div>
@@ -356,12 +356,12 @@ export function Chatbot({ apiEndpoint, config }: ChatbotProps) {
                 type="text"
                 placeholder="Ask me about the damage, repairs, costs, or insurance..."
                 disabled={isLoading}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+                className="flex-1 px-4 py-2 border aqua-border-primary rounded-lg focus:ring-2 focus:ring-accent-orange focus:border-accent-orange aqua-bg-secondary aqua-text-primary"
               />
               <button
                 type="submit"
                 disabled={isLoading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                className="aqua-button px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
               >
                 Send
               </button>

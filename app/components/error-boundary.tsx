@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
       // Default error UI
       return (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-800 dark:bg-red-900/20">
+        <div className="rounded-lg border p-6" style={{backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)'}}>
           <div className="flex items-center gap-2 mb-4">
             <span className="text-red-600 dark:text-red-400 text-xl">⚠️</span>
             <h3 className="text-red-800 dark:text-red-200 font-semibold">

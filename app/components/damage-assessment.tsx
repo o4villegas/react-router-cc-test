@@ -531,12 +531,12 @@ export function DamageAssessment({
       <main id="main-content" className="flex items-center justify-center pt-16 pb-4">
         <div className="flex-1 flex flex-col items-center gap-8 min-h-0 max-w-6xl">
         <header className="flex flex-col items-center gap-6">
-          <h1 className="text-6xl font-bold text-center aqua-inspect-title">
+          <h1 className="text-4xl md:text-6xl font-bold text-center aqua-inspect-title">
             <span>Aqua</span>
             <span className="aqua-inspect-accent"> Inspect</span>
             <span> Vision</span>
           </h1>
-          <p className="text-center max-w-2xl text-lg" style={{ color: '#a0a0a0' }}>
+          <p className="text-center max-w-2xl text-lg aqua-text-secondary">
             Professional AI-powered water damage assessment with computer vision and industry expertise
           </p>
         </header>
@@ -562,7 +562,7 @@ export function DamageAssessment({
         </div>
 
         {/* Step-by-Step Flow */}
-        <div className="w-full max-w-4xl mx-auto space-y-8 px-4">
+        <div className="w-full max-w-4xl mx-auto space-y-8 px-4 sm:px-6 lg:px-8">
           
           {/* Step 1: Image Upload - Always Visible */}
           <div className="aqua-card rounded-2xl p-8">
@@ -575,12 +575,7 @@ export function DamageAssessment({
               type="file" 
               accept={config.image.allowed_types.join(',')} 
               onChange={handleImageUpload}
-              className="w-full mb-4 p-3 rounded-lg border transition-all duration-300"
-              style={{ 
-                backgroundColor: '#1a1a1a', 
-                borderColor: '#333333', 
-                color: '#ffffff' 
-              }}
+              className="w-full mb-4 p-3 rounded-lg border transition-all duration-300 aqua-bg-secondary aqua-border-primary aqua-text-primary"
               aria-describedby="upload-help upload-error"
               aria-label="Upload damage photo for AI analysis"
             />
@@ -590,11 +585,11 @@ export function DamageAssessment({
             {validationError && (
               <div 
                 id="upload-error" 
-                className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg dark:bg-red-900/20 dark:border-red-800"
+                className="mb-4 p-3 bg-red-100 border border-red-300 rounded-lg" style={{backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)'}}
                 role="alert"
                 aria-live="polite"
               >
-                <p className="text-red-700 dark:text-red-400 text-sm font-medium">
+                <p className="text-red-400 text-sm font-medium">
                   ❌ {validationError.message}
                 </p>
               </div>
@@ -608,8 +603,8 @@ export function DamageAssessment({
                 />
                 
                 {compressionStats && compressionStats.compressed && (
-                  <div className="p-2 bg-green-50 border border-green-200 rounded dark:bg-green-900/20 dark:border-green-800">
-                    <p className="text-green-700 dark:text-green-400 text-xs">
+                  <div className="p-2 rounded border" style={{backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.3)'}}>
+                    <p className="text-green-400 text-xs">
                       ✅ Image optimized: {(compressionStats.originalSize / 1024 / 1024).toFixed(1)}MB → {(compressionStats.compressedSize / 1024 / 1024).toFixed(1)}MB 
                       ({Math.round((1 - compressionStats.compressedSize / compressionStats.originalSize) * 100)}% reduction)
                     </p>
@@ -628,12 +623,12 @@ export function DamageAssessment({
                 
                 {/* Progress Bar */}
                 {loading && (
-                  <div className="w-full space-y-3">
+                  <div className="w-full space-y-3" role="region" aria-live="polite" aria-label="Assessment progress">
                     <div className="flex justify-between items-center text-sm">
-                      <span className="aqua-inspect-accent font-medium">{loadingStage}</span>
-                      <span className="text-white font-semibold">{Math.round(loadingProgress)}%</span>
+                      <span className="aqua-inspect-accent font-medium" id="progress-stage">{loadingStage}</span>
+                      <span className="aqua-inspect-accent font-semibold">{Math.round(loadingProgress)}%</span>
                     </div>
-                    <div className="aqua-progress-bg rounded-xl overflow-hidden h-3">
+                    <div className="aqua-progress-bg rounded-xl overflow-hidden h-3 border aqua-border-primary">
                       <div 
                         className="aqua-progress-fill h-full rounded-xl transition-all duration-500"
                         style={{ width: `${loadingProgress}%` }}
@@ -641,10 +636,11 @@ export function DamageAssessment({
                         aria-valuenow={loadingProgress}
                         aria-valuemin={0}
                         aria-valuemax={100}
-                        aria-label="Assessment progress"
+                        aria-label={`Assessment progress: ${Math.round(loadingProgress)}%`}
+                        aria-describedby="progress-stage progress-help"
                       ></div>
                     </div>
-                    <div className="text-xs text-center" style={{ color: '#666666' }}>
+                    <div id="progress-help" className="text-xs text-center aqua-text-muted">
                       AI processing typically takes 20-30 seconds
                     </div>
                   </div>
@@ -721,12 +717,7 @@ export function DamageAssessment({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Ask about remediation steps, equipment needed, timeline..."
-                    className="flex-1 p-3 rounded-lg border transition-all duration-300"
-                    style={{ 
-                      backgroundColor: '#1a1a1a', 
-                      borderColor: '#333333', 
-                      color: '#ffffff' 
-                    }}
+                    className="flex-1 p-3 rounded-lg border transition-all duration-300 aqua-bg-secondary aqua-border-primary aqua-text-primary placeholder:aqua-text-muted"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
